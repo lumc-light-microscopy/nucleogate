@@ -1,4 +1,4 @@
-# nucleoflow
+# nucleogate
 
 **Flow-cytometry-style analysis of high-content microscopy: nuclear
 segmentation, multi-marker gating and foci counting, straight from OMERO.**
