@@ -1,0 +1,44 @@
+# Pinned to the TensorFlow 2.10 / Python 3.10 stack.
+#
+# WHY THESE PINS: TensorFlow 2.10 is the last release with native-Windows GPU
+# support, and it supports Python 3.7-3.10 only. TF 2.10 in turn requires
+# numpy<1.24 and protobuf<3.20. Breaking any one of these pins breaks GPU
+# segmentation on Windows.
+#
+# PREFER environment.yml (conda) -- omero-py needs zeroc-ice, which is painful
+# to build from source with pip. If you must use pip, install the Ice wheel
+# first: https://omero.readthedocs.io/en/stable/developers/Python.html
+#
+#   pip install -r requirements.txt
+#   python omero_nuclei_flow.py --check-env
+
+# --- CRITICAL: setuptools 82 removed pkg_resources, which StarDist imports ---
+setuptools<81
+
+# --- OMERO client ------------------------------------------------------------
+zeroc-ice==3.6.5              # install from conda-forge or a Glencoe wheel
+omero-py>=5.17,<6
+
+# --- scientific stack (versions dictated by TensorFlow 2.10) -----------------
+numpy==1.23.5                 # TF<2.11 breaks on >=1.24; StarDist breaks on 2.x
+pandas==2.0.3
+scipy==1.10.1
+scikit-image==0.21.0          # >=0.19 required (intensity_mean/intensity_max)
+matplotlib==3.7.3
+scikit-learn==1.3.2           # optional: --threshold-method gmm
+
+# --- table formats -----------------------------------------------------------
+pyarrow==12.0.1               # optional: --per-nucleus-format parquet
+openpyxl==3.1.2               # optional: --per-nucleus-format xlsx
+
+# --- segmentation: StarDist (default) ----------------------------------------
+tensorflow==2.10.1            # Windows GPU ceiling; needs CUDA 11.2 + cuDNN 8.1
+protobuf==3.19.6              # TF<2.11 is binary-incompatible with >=3.20
+h5py==3.7.0
+stardist==0.8.5
+csbdeep==0.7.4
+
+# --- segmentation: Cellpose (alternative, PyTorch) ---------------------------
+# Not pinned to an end-of-life stack; see environment-cellpose.yml
+# torch>=2.1
+# cellpose>=3.0

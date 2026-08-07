@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Condition Explorer — replicate wells, grouped and tested</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#0B1017; --panel:#141C28; --panel-2:#1B2534; --line:#2C3D52;
+  --ink:#F1F5F9; --dim:#A7B3C3; --faint:#7A8EA9; --off:#33455C;
+  /* Okabe–Ito: distinguishable for the ~8% of men with colour-vision deficiency.
+     Conditions must never be told apart by hue alone anyway — every group is
+     also labelled and ordered — but this costs nothing and helps. */
+  --g0:#56B4E9; --g1:#E69F00; --g2:#009E73; --g3:#CC79A7;
+  --g4:#0072B2; --g5:#D55E00; --g6:#F0E442; --g7:#9C9C9C;
+  --ok:#3FD16B; --warn:#FFA23D; --bad:#FF5470;
+  --r:3px;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Space Grotesk',ui-sans-serif,system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--void); color:var(--ink); font-family:var(--sans);
+  font-size:13px; line-height:1.45; overflow:hidden; -webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--g0); outline-offset:2px}
+
+#app{display:none; height:100vh; grid-template-rows:auto 1fr}
+#app.ready{display:grid}
+header{display:flex; align-items:center; gap:16px; padding:9px 16px;
+  border-bottom:1px solid var(--line); background:var(--panel)}
+.brand{font-weight:700; letter-spacing:-.02em; font-size:14px; white-space:nowrap}
+.brand span{color:var(--g0)}
+.stat{font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap}
+.stat b{color:var(--ink); font-weight:500; font-variant-numeric:tabular-nums}
+header .sp{flex:1}
+.btn{background:var(--panel-2); border:1px solid var(--line); border-radius:var(--r);
+  padding:5px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap;
+  transition:border-color .12s, background .12s}
+.btn:hover{border-color:var(--faint); background:#26344A}
+.btn.primary{border-color:var(--g0); color:var(--g0)}
+.btn.primary:hover{background:rgba(86,180,233,.12)}
+
+main{display:grid; grid-template-columns:392px 1fr; min-height:0}
+aside{border-right:1px solid var(--line); background:var(--panel);
+  overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:18px}
+.work{overflow-y:auto; padding:16px 18px 44px; display:flex; flex-direction:column; gap:18px}
+.sec-h{display:flex; align-items:baseline; gap:8px; margin-bottom:8px;
+  font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim)}
+.sec-h .n{font-family:var(--mono); color:var(--faint); font-size:10px;
+  text-transform:none; letter-spacing:0}
+.sec-h .act{margin-left:auto; text-transform:none; letter-spacing:0; font-size:10.5px;
+  color:var(--faint); cursor:pointer; border:0; background:none; padding:0}
+.sec-h .act:hover{color:var(--g0)}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:14px}
+
+/* ---- plate: paint wells with the active group ---- */
+#plateWrap{overflow-x:auto; padding-bottom:4px}
+#plate{border-collapse:separate; border-spacing:3px; font-family:var(--mono); font-size:9.5px}
+#plate th{color:var(--faint); font-weight:400; font-size:9.5px; padding:0 2px}
+.well{width:var(--wsz,22px); height:var(--wsz,22px); border-radius:3px; cursor:pointer;
+  background:var(--off); border:1px solid transparent; transition:transform .08s;
+  position:relative; display:flex; align-items:center; justify-content:center;
+  font-size:8px; color:#0B1017; font-weight:700}
+.well:hover{transform:scale(1.25); z-index:5; border-color:var(--ink)}
+.well.empty{background:transparent; cursor:default}
+.well.empty:hover{transform:none; border-color:transparent}
+.well.unassigned{background:var(--off)}
+
+/* ---- groups ---- */
+.grp{display:flex; align-items:center; gap:8px; padding:6px 7px; border-radius:var(--r);
+  border:1px solid transparent; cursor:pointer; margin-bottom:3px}
+.grp:hover{background:var(--panel-2)}
+.grp.active{border-color:var(--g0); background:var(--panel-2)}
+.grp .sw{width:13px; height:13px; border-radius:3px; flex:none}
+.grp .nm{flex:1; min-width:0; font-size:12px; background:none; border:0; padding:2px 3px;
+  border-radius:2px}
+.grp .nm:hover{background:var(--panel)}
+.grp .ct{font-family:var(--mono); font-size:10.5px; color:var(--dim)}
+.grp .ct.low{color:var(--warn)}
+.grp .rm{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;
+  padding:0 3px; line-height:1}
+.grp .rm:hover{color:var(--bad)}
+.hint{color:var(--faint); font-size:11px; font-family:var(--mono); line-height:1.5}
+.row{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.row label{font-size:11px; color:var(--dim)}
+select,input[type=text]{background:var(--panel-2); border:1px solid var(--line);
+  border-radius:var(--r); padding:4px 7px; font-size:11px; font-family:var(--mono); width:100%}
+
+/* ---- plots ---- */
+.plot canvas{width:100%; display:block; border-radius:2px}
+.plot .cap{font-family:var(--mono); font-size:10px; color:var(--faint);
+  margin-top:5px; text-align:center}
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px}
+
+/* ---- tables ---- */
+.tbl{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:10.5px}
+.tbl th{text-align:right; color:var(--dim); font-weight:500; padding:5px 7px;
+  border-bottom:1px solid var(--line); font-size:9.5px; letter-spacing:.04em;
+  text-transform:uppercase; white-space:nowrap; position:sticky; top:0; background:var(--panel)}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl td{padding:4px 7px; border-bottom:1px solid #22303F; text-align:right;
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+.tbl tr:hover td{background:var(--panel-2)}
+.tblScroll{max-height:340px; overflow:auto}
+.sig{font-weight:700}
+.sig.y{color:var(--ok)} .sig.n{color:var(--faint)}
+.pill{display:inline-block; padding:0 5px; border-radius:8px; font-size:9.5px;
+  border:1px solid var(--line); color:var(--dim)}
+
+/* ---- warnings ---- */
+.warn{border-left:3px solid var(--warn); background:rgba(255,162,61,.07);
+  padding:9px 12px; border-radius:var(--r); font-size:11.5px; line-height:1.55;
+  color:var(--ink); margin-bottom:12px}
+.warn b{color:var(--warn)}
+.warn.bad{border-left-color:var(--bad); background:rgba(255,84,112,.07)}
+.warn.bad b{color:var(--bad)}
+
+/* ---- drop ---- */
+#drop{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:20px; background:var(--void); z-index:50; padding:24px}
+#drop.hide{display:none}
+.dz{border:1px dashed var(--line); border-radius:6px; padding:42px 52px; text-align:center; max-width:640px}
+.dz.hot{border-color:var(--g0); background:rgba(86,180,233,.05)}
+.dz h1{font-size:23px; font-weight:700; letter-spacing:-.025em; margin-bottom:6px}
+.dz h1 em{font-style:normal; color:var(--g0)}
+.dz p{color:var(--dim); font-size:12.5px; margin-bottom:18px; line-height:1.6}
+.dz code{font-family:var(--mono); font-size:11.5px; color:var(--g1);
+  background:var(--panel); padding:1px 5px; border-radius:2px}
+.swatches{display:flex; gap:4px; justify-content:center; margin-bottom:24px}
+.swatches i{width:30px; height:4px; border-radius:2px; display:block}
+#err{color:var(--bad); font-family:var(--mono); font-size:11.5px; max-width:640px;
+  text-align:center; min-height:17px}
+#busy{position:fixed;inset:0;background:rgba(11,16,23,.82);display:none;align-items:center;
+  justify-content:center;z-index:60;font-family:var(--mono);font-size:12px;color:var(--g0)}
+#busy.on{display:flex}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:var(--void)}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="drop">
+  <div class="swatches">
+    <i style="background:var(--g0)"></i><i style="background:var(--g1)"></i>
+    <i style="background:var(--g2)"></i><i style="background:var(--g3)"></i>
+    <i style="background:var(--g4)"></i><i style="background:var(--g5)"></i>
+  </div>
+  <div class="dz" id="dz">
+    <h1>Condition <em>Explorer</em></h1>
+    <p>Group replicate wells into conditions, then compare them properly.<br>
+       Drop a <code>per_well_summary.csv</code> — or a per-nucleus file, or the
+       export from the Gating Explorer.<br>
+       Every well is one replicate. Nothing leaves your computer.</p>
+    <button class="btn primary" id="pick">Choose a file</button>
+    <input type="file" id="file" accept=".csv,.gz,.tsv,.txt" hidden>
+  </div>
+  <div id="err"></div>
+</div>
+<div id="busy">reading…</div>
+
+<div id="app">
+  <header>
+    <div class="brand">Condition <span>Explorer</span></div>
+    <div class="stat" id="sFile">—</div>
+    <div class="stat">wells <b id="sWells">0</b></div>
+    <div class="stat">groups <b id="sGroups">0</b></div>
+    <div class="stat" id="sDesign">—</div>
+    <div class="sp"></div>
+    <button class="btn" id="bAuto">Auto-group</button>
+    <button class="btn" id="bClear">Clear groups</button>
+    <button class="btn primary" id="bExport">Export report</button>
+    <button class="btn" id="bNew">New file</button>
+  </header>
+  <main>
+    <aside>
+      <section>
+        <div class="sec-h"><span>Plate</span><span class="n" id="plateName"></span></div>
+        <div id="plateWrap"><table id="plate"></table></div>
+        <div class="hint" style="margin-top:8px" id="paintHint"></div>
+      </section>
+      <section>
+        <div class="sec-h"><span>Conditions</span>
+          <button class="act" id="addGrp">+ add</button></div>
+        <div id="groups"></div>
+        <div class="row" style="margin-top:10px"><label for="autoCol">Auto-group by</label></div>
+        <select id="autoCol"></select>
+      </section>
+      <section>
+        <div class="sec-h"><span>Readout</span></div>
+        <select id="metric"></select>
+        <div class="row" style="margin-top:10px"><label for="ref">Reference condition</label></div>
+        <select id="ref"></select>
+        <div class="row" style="margin-top:10px"><label for="test">Test</label></div>
+        <select id="test">
+          <option value="welch">Welch t / Welch ANOVA (default)</option>
+          <option value="student">Student t / one-way ANOVA</option>
+          <option value="rank">Mann–Whitney / Kruskal–Wallis</option>
+        </select>
+        <div class="row" style="margin-top:10px"><label for="corr">Correction</label></div>
+        <select id="corr">
+          <option value="holm">Holm (family-wise)</option>
+          <option value="bh">Benjamini–Hochberg (FDR)</option>
+          <option value="none">None</option>
+        </select>
+      </section>
+    </aside>
+
+    <div class="work">
+      <div id="warnings"></div>
+      <section class="card">
+        <div class="sec-h"><span>Overview</span><span class="n" id="ovNote"></span></div>
+        <div class="grid2">
+          <div class="plot"><canvas id="cSuper"></canvas>
+            <div class="cap">every dot is one well · bar = mean · whiskers = 95% CI</div></div>
+          <div class="plot"><canvas id="cEffect"></canvas>
+            <div class="cap" id="effCap">difference from reference · bootstrap 95% CI</div></div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="sec-h"><span>Per condition</span><span class="n">n = wells, not cells</span></div>
+        <div class="tblScroll"><table class="tbl" id="tGroup"></table></div>
+      </section>
+      <section class="card">
+        <div class="sec-h"><span>Comparisons</span><span class="n" id="omni"></span></div>
+        <div class="tblScroll"><table class="tbl" id="tPair"></table></div>
+        <div class="hint" style="margin-top:10px" id="testNote"></div>
+      </section>
+      <section class="card">
+        <div class="sec-h"><span>Wells</span><span class="n" id="wellNote"></span></div>
+        <div class="tblScroll"><table class="tbl" id="tWell"></table></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.inflate.min.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   Well-level statistics for condition comparison.
+   The unit of replication is the WELL, never the cell.
+   ============================================================ */
+
+// ---- special functions -------------------------------------
+function logGamma(x){
+  const g = [676.5203681218851,-1259.1392167224028,771.32342877765313,
+             -176.61502916214059,12.507343278686905,-0.13857109526572012,
+             9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x < 0.5) return Math.log(Math.PI/Math.sin(Math.PI*x)) - logGamma(1-x);
+  x -= 1;
+  let a = 0.99999999999980993, t = x + 7.5;
+  for(let i=0;i<8;i++) a += g[i]/(x+i+1);
+  return 0.5*Math.log(2*Math.PI) + (x+0.5)*Math.log(t) - t + Math.log(a);
+}
+/** Continued fraction for the incomplete beta (Lentz). */
+function betacf(a,b,x){
+  const FPMIN = 1e-300, EPS = 3e-16;
+  let qab = a+b, qap = a+1, qam = a-1;
+  let c = 1, d = 1 - qab*x/qap;
+  if(Math.abs(d) < FPMIN) d = FPMIN;
+  d = 1/d; let h = d;
+  for(let m=1;m<=300;m++){
+    const m2 = 2*m;
+    let aa = m*(b-m)*x/((qam+m2)*(a+m2));
+    d = 1 + aa*d; if(Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa/c; if(Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1/d; h *= d*c;
+    aa = -(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+    d = 1 + aa*d; if(Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa/c; if(Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1/d;
+    const del = d*c; h *= del;
+    if(Math.abs(del-1) < EPS) break;
+  }
+  return h;
+}
+/** Regularised incomplete beta I_x(a,b). */
+function betai(a,b,x){
+  if(x <= 0) return 0;
+  if(x >= 1) return 1;
+  const bt = Math.exp(logGamma(a+b)-logGamma(a)-logGamma(b)+a*Math.log(x)+b*Math.log(1-x));
+  return x < (a+1)/(a+b+2) ? bt*betacf(a,b,x)/a : 1 - bt*betacf(b,a,1-x)/b;
+}
+/** Two-sided p from Student's t. */
+function tTest2sided(t, df){
+  if(!isFinite(t) || !(df > 0)) return NaN;
+  return betai(df/2, 0.5, df/(df + t*t));
+}
+/** Upper tail of the F distribution. */
+function fSF(F, df1, df2){
+  if(!isFinite(F) || F <= 0) return 1;
+  return betai(df2/2, df1/2, df2/(df2 + df1*F));
+}
+/** Chi-square upper tail, via the regularised incomplete gamma. */
+function gammaincUpper(s, x){
+  if(x <= 0) return 1;
+  if(x < s+1){                       // series
+    let sum = 1/s, term = sum;
+    for(let n=1;n<500;n++){ term *= x/(s+n); sum += term;
+      if(Math.abs(term) < Math.abs(sum)*1e-15) break; }
+    return 1 - sum*Math.exp(-x + s*Math.log(x) - logGamma(s));
+  }
+  let b = x+1-s, c = 1e300, d = 1/b, h = d;    // continued fraction
+  for(let i=1;i<500;i++){
+    const an = -i*(i-s);
+    b += 2; d = an*d + b; if(Math.abs(d) < 1e-300) d = 1e-300;
+    c = b + an/c; if(Math.abs(c) < 1e-300) c = 1e-300;
+    d = 1/d; const del = d*c; h *= del;
+    if(Math.abs(del-1) < 1e-15) break;
+  }
+  return Math.exp(-x + s*Math.log(x) - logGamma(s))*h;
+}
+const chi2SF = (x, k) => gammaincUpper(k/2, x/2);
+/** Standard normal CDF, routed through the incomplete gamma so it is accurate
+ *  to ~1e-15 rather than the ~1e-7 of the usual erf polynomial - p-values near
+ *  a decision threshold deserve better than a rational approximation. */
+function normCDF(z){
+  if(z === 0) return 0.5;
+  const half = 0.5*gammaincUpper(0.5, z*z/2);   // = 0.5*erfc(|z|/sqrt2)
+  return z < 0 ? half : 1 - half;
+}
+
+
+// ---- descriptives ------------------------------------------
+const mean = a => a.reduce((x,y)=>x+y,0)/a.length;
+function sd(a){                       // sample SD (n-1)
+  if(a.length < 2) return NaN;
+  const m = mean(a);
+  return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1));
+}
+const sem = a => sd(a)/Math.sqrt(a.length);
+function median(a){
+  const s = [...a].sort((x,y)=>x-y), n = s.length;
+  return n%2 ? s[(n-1)/2] : 0.5*(s[n/2-1]+s[n/2]);
+}
+function quantile(a,q){
+  const s = [...a].sort((x,y)=>x-y);
+  const p = q*(s.length-1), lo = Math.floor(p), hi = Math.ceil(p);
+  return s[lo] + (s[hi]-s[lo])*(p-lo);
+}
+/** Inverse Student-t by bisection - only needed for CI half-widths. */
+function tCrit(p, df){                // two-sided p, e.g. 0.05
+  let lo = 0, hi = 200;
+  for(let i=0;i<200;i++){ const mid = (lo+hi)/2;
+    if(tTest2sided(mid, df) > p) lo = mid; else hi = mid; }
+  return (lo+hi)/2;
+}
+function ciMean(a, alpha = 0.05){
+  const n = a.length;
+  if(n < 2) return [NaN, NaN];
+  const m = mean(a), h = tCrit(alpha, n-1)*sem(a);
+  return [m-h, m+h];
+}
+
+// ---- two-group tests ---------------------------------------
+function welch(a, b){
+  const na = a.length, nb = b.length;
+  if(na < 2 || nb < 2) return { t:NaN, df:NaN, p:NaN };
+  const va = sd(a)**2/na, vb = sd(b)**2/nb;
+  const t = (mean(a)-mean(b))/Math.sqrt(va+vb);
+  const df = (va+vb)**2 / (va*va/(na-1) + vb*vb/(nb-1));
+  return { t, df, p:tTest2sided(t, df) };
+}
+function studentT(a, b){
+  const na = a.length, nb = b.length;
+  if(na < 2 || nb < 2) return { t:NaN, df:NaN, p:NaN };
+  const df = na+nb-2;
+  const sp2 = ((na-1)*sd(a)**2 + (nb-1)*sd(b)**2)/df;
+  const t = (mean(a)-mean(b))/Math.sqrt(sp2*(1/na+1/nb));
+  return { t, df, p:tTest2sided(t, df) };
+}
+/** Mann-Whitney U, normal approximation with tie correction. */
+function mannWhitney(a, b){
+  const na = a.length, nb = b.length;
+  if(!na || !nb) return { U:NaN, p:NaN };
+  const all = [...a.map(v=>[v,0]), ...b.map(v=>[v,1])].sort((x,y)=>x[0]-y[0]);
+  const ranks = new Array(all.length);
+  let i = 0, tieSum = 0;
+  while(i < all.length){
+    let j = i; while(j+1 < all.length && all[j+1][0] === all[i][0]) j++;
+    const r = (i+j)/2 + 1;
+    for(let k=i;k<=j;k++) ranks[k] = r;
+    const tj = j-i+1; if(tj > 1) tieSum += tj**3 - tj;
+    i = j+1;
+  }
+  let Ra = 0;
+  for(let k=0;k<all.length;k++) if(all[k][1] === 0) Ra += ranks[k];
+  const U1 = Ra - na*(na+1)/2, U2 = na*nb - U1;
+  const U = Math.min(U1, U2);
+  const mu = na*nb/2;
+  const N = na+nb;
+  const sig = Math.sqrt(na*nb/12 * ((N+1) - tieSum/(N*(N-1))));
+  const z = (U - mu)/sig;             // no continuity correction (scipy default)
+  return { U:U1, p: sig > 0 ? 2*normCDF(-Math.abs(z)) : NaN };
+}
+/** Hedges' g with its CI - effect size that doesn't depend on n. */
+function hedgesG(a, b, alpha = 0.05){
+  const na = a.length, nb = b.length;
+  if(na < 2 || nb < 2) return { g:NaN, lo:NaN, hi:NaN };
+  const df = na+nb-2;
+  const sp = Math.sqrt(((na-1)*sd(a)**2 + (nb-1)*sd(b)**2)/df);
+  const d = (mean(a)-mean(b))/sp;
+  const J = 1 - 3/(4*df - 1);         // small-sample correction
+  const g = d*J;
+  const se = Math.sqrt((na+nb)/(na*nb) + g*g/(2*(na+nb)));
+  const z = 1.959963984540054;
+  return { g, lo:g - z*se, hi:g + z*se };
+}
+
+// ---- k-group tests -----------------------------------------
+function anova(groups){
+  const k = groups.length;
+  const N = groups.reduce((s,g)=>s+g.length,0);
+  if(k < 2 || N-k < 1) return { F:NaN, df1:NaN, df2:NaN, p:NaN };
+  const grand = mean(groups.flat());
+  let ssb = 0, ssw = 0;
+  for(const g of groups){
+    const m = mean(g);
+    ssb += g.length*(m-grand)**2;
+    for(const v of g) ssw += (v-m)**2;
+  }
+  const df1 = k-1, df2 = N-k;
+  const F = (ssb/df1)/(ssw/df2);
+  return { F, df1, df2, p:fSF(F, df1, df2) };
+}
+/** Welch's ANOVA - does not assume equal variances. */
+function welchAnova(groups){
+  const k = groups.length;
+  if(k < 2 || groups.some(g=>g.length < 2)) return { F:NaN, df1:NaN, df2:NaN, p:NaN };
+  const w = groups.map(g => g.length/(sd(g)**2));
+  const sw = w.reduce((a,b)=>a+b,0);
+  const mbar = groups.reduce((s,g,i)=>s + w[i]*mean(g),0)/sw;
+  let num = 0, lam = 0;
+  groups.forEach((g,i)=>{
+    num += w[i]*(mean(g)-mbar)**2;
+    lam += (1 - w[i]/sw)**2/(g.length-1);
+  });
+  const df1 = k-1;
+  const df2 = (k*k-1)/(3*lam);
+  const F = (num/df1)/(1 + 2*(k-2)/(k*k-1)*lam);
+  return { F, df1, df2, p:fSF(F, df1, df2) };
+}
+function kruskal(groups){
+  const k = groups.length;
+  const all = [];
+  groups.forEach((g,i)=> g.forEach(v=> all.push([v,i])));
+  all.sort((x,y)=>x[0]-y[0]);
+  const N = all.length;
+  const ranks = new Array(N);
+  let i = 0, tieSum = 0;
+  while(i < N){
+    let j = i; while(j+1 < N && all[j+1][0] === all[i][0]) j++;
+    const r = (i+j)/2 + 1;
+    for(let m=i;m<=j;m++) ranks[m] = r;
+    const tj = j-i+1; if(tj > 1) tieSum += tj**3 - tj;
+    i = j+1;
+  }
+  const Rsum = new Array(k).fill(0), n = groups.map(g=>g.length);
+  for(let m=0;m<N;m++) Rsum[all[m][1]] += ranks[m];
+  let H = 0;
+  for(let g=0;g<k;g++) H += Rsum[g]**2/n[g];
+  H = 12/(N*(N+1))*H - 3*(N+1);
+  if(tieSum) H /= (1 - tieSum/(N**3 - N));
+  return { H, df:k-1, p:chi2SF(H, k-1) };
+}
+
+// ---- multiple comparisons ----------------------------------
+/** Holm-Bonferroni: controls family-wise error, uniformly better than plain Bonferroni. */
+function holm(ps){
+  const idx = ps.map((p,i)=>[p,i]).filter(x=>isFinite(x[0])).sort((a,b)=>a[0]-b[0]);
+  const m = idx.length, out = new Array(ps.length).fill(NaN);
+  let prev = 0;
+  idx.forEach(([p,i],r)=>{
+    const adj = Math.min(1, Math.max(prev, (m-r)*p));
+    out[i] = adj; prev = adj;
+  });
+  return out;
+}
+/** Benjamini-Hochberg FDR. */
+function bh(ps){
+  const idx = ps.map((p,i)=>[p,i]).filter(x=>isFinite(x[0])).sort((a,b)=>a[0]-b[0]);
+  const m = idx.length, out = new Array(ps.length).fill(NaN);
+  let prev = 1;
+  for(let r=m-1;r>=0;r--){
+    const [p,i] = idx[r];
+    prev = Math.min(prev, p*m/(r+1));
+    out[i] = Math.min(1, prev);
+  }
+  return out;
+}
+
+// ---- bootstrap ---------------------------------------------
+function mulberry32(seed){
+  return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed>>>15, 1 | seed);
+    t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t;
+    return ((t ^ t>>>14) >>> 0) / 4294967296; };
+}
+/** Percentile bootstrap CI for the difference of means. */
+function bootDiff(a, b, n = 5000, seed = 42){
+  const rnd = mulberry32(seed), out = new Float64Array(n);
+  for(let i=0;i<n;i++){
+    let sa = 0, sb = 0;
+    for(let j=0;j<a.length;j++) sa += a[(rnd()*a.length)|0];
+    for(let j=0;j<b.length;j++) sb += b[(rnd()*b.length)|0];
+    out[i] = sa/a.length - sb/b.length;
+  }
+  const s = Array.from(out).sort((x,y)=>x-y);
+  return { diff: mean(a)-mean(b),
+           lo: s[Math.floor(0.025*(n-1))], hi: s[Math.floor(0.975*(n-1))] };
+}
+
+// ---- assay quality -----------------------------------------
+/** Z'-factor (Zhang 1999): >0.5 excellent, 0-0.5 marginal, <0 unusable. */
+function zPrime(pos, neg){
+  if(pos.length < 2 || neg.length < 2) return NaN;
+  return 1 - (3*(sd(pos)+sd(neg)))/Math.abs(mean(pos)-mean(neg));
+}
+/** Strictly standardised mean difference. */
+function ssmd(a, b){
+  if(a.length < 2 || b.length < 2) return NaN;
+  return (mean(a)-mean(b))/Math.sqrt(sd(a)**2 + sd(b)**2);
+}
+
+const _unused_exports = {
+  logGamma, betai, tTest2sided, fSF, normCDF, chi2SF,
+  mean, sd, sem, median, quantile, tCrit, ciMean,
+  welch, studentT, mannWhitney, hedgesG,
+  anova, welchAnova, kruskal, holm, bh, bootDiff, zPrime, ssmd };
+
+/* ============================================================
+   Condition Explorer — group replicate wells, then compare them.
+
+   Design rule, enforced throughout: the unit of replication is the
+   WELL. Cells within a well share a treatment, a staining and an
+   illumination pattern, so they are not independent. Every statistic
+   below has n = number of wells.
+   ============================================================ */
+
+const GCOL = ["--g0","--g1","--g2","--g3","--g4","--g5","--g6","--g7"];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+const S = {
+  name:"", rows:0, cols:{}, header:[], kind:"well",
+  wells:[], wellRows:new Map(), plates:[], plate:null,
+  groups:[], assign:new Map(), active:0,
+  metrics:[], metric:null, ref:0,
+  test:"welch", corr:"holm",
+  result:null,
+};
+
+/* ---------- CSV ------------------------------------------- */
+function parseCSV(text){
+  const nl = text.indexOf("\n");
+  if(nl < 0) throw new Error("That file has no rows.");
+  const head0 = text.slice(0, nl);
+  const delim = [",","\t",";"].map(d=>[d, head0.split(d).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const split = line => {
+    const out = []; let cur = "", q = false;
+    for(let i=0;i<line.length;i++){
+      const c = line[i];
+      if(q){ if(c === '"'){ if(line[i+1] === '"'){cur+='"';i++;} else q=false; } else cur += c; }
+      else if(c === '"') q = true;
+      else if(c === delim){ out.push(cur); cur = ""; }
+      else if(c !== "\r") cur += c;
+    }
+    out.push(cur); return out;
+  };
+  // trailing "# ..." provenance lines from the Gating Explorer are metadata
+  const lines = text.split("\n").filter(l => l.length > 1 && !l.startsWith("#"));
+  const header = split(lines[0]);
+  const n = lines.length - 1;
+  if(n < 1) throw new Error("That file has a header but no data rows.");
+
+  const numeric = header.map(()=>true);
+  for(let i=1;i<Math.min(lines.length, 500);i++){
+    const f = split(lines[i]);
+    for(let c=0;c<header.length;c++){
+      const v = f[c];
+      if(v === undefined || v === "" || v === "NA" || v === "NaN") continue;
+      if(v === "True" || v === "False") continue;
+      if(numeric[c] && !isFinite(Number(v))) numeric[c] = false;
+    }
+  }
+  const cols = {};
+  header.forEach((h,c)=>{ cols[h] = numeric[c] ? new Float64Array(n) : new Array(n); });
+  for(let i=1;i<lines.length;i++){
+    const f = split(lines[i]);
+    for(let c=0;c<header.length;c++){
+      const h = header[c], v = f[c];
+      if(numeric[c]) cols[h][i-1] = (v === "True") ? 1 : (v === "False") ? 0
+                     : (v === undefined || v === "") ? NaN : Number(v);
+      else cols[h][i-1] = v === undefined ? "" : v;
+    }
+  }
+  return { header, cols, rows:n };
+}
+
+/* ---------- detect the shape of the file ------------------- */
+function detect(){
+  const h = S.header;
+  if(!h.includes("well")) throw new Error(
+    "No 'well' column found — this tool groups wells, so it needs one.");
+
+  const perCell = h.some(c => /^(mean|median|integrated)_/.test(c)) && !h.includes("n_cells");
+  S.kind = perCell ? "cell" : "well";
+
+  const pl = S.cols["plate"];
+  S.plates = pl ? [...new Set(Array.from(pl).map(String))] : ["(all)"];
+  S.plate = S.plates[0];
+
+  // one row per well, or aggregate the cells into wells
+  S.wellRows = new Map();
+  for(let i=0;i<S.rows;i++){
+    if(pl && String(pl[i]) !== S.plate) continue;
+    const w = String(S.cols["well"][i]);
+    let a = S.wellRows.get(w); if(!a){ a = []; S.wellRows.set(w, a); }
+    a.push(i);
+  }
+  S.wells = [...S.wellRows.keys()].sort(cmpWell);
+  if(!S.wells.length) throw new Error("No wells found.");
+
+  buildMetrics();
+  if(!S.metrics.length) throw new Error(
+    "No numeric readout columns found to compare between conditions.");
+  // Prefer a biological readout over a bookkeeping column: cell count is
+  // rarely the thing you set out to compare.
+  const pref = S.metrics.find(m => /^pct_.*_positive$/.test(m.key))
+            || S.metrics.find(m => /^pct_(double|triple)/.test(m.key))
+            || S.metrics.find(m => /^pct_/.test(m.key))
+            || S.metrics.find(m => m.key.startsWith("__pop_"))
+            || S.metrics.find(m => /^pos_/.test(m.key))
+            || S.metrics.find(m => !/^n_cells$/.test(m.key))
+            || S.metrics[0];
+  S.metric = pref.key;
+}
+function cmpWell(a,b){
+  const ra = /^([A-Z]+)(\d+)$/i.exec(a), rb = /^([A-Z]+)(\d+)$/i.exec(b);
+  if(ra && rb) return ra[1] === rb[1] ? (+ra[2])-(+rb[2]) : ra[1].localeCompare(rb[1]);
+  return String(a).localeCompare(String(b));
+}
+function wellRC(k){
+  const r = /^([A-Z]+)(\d+)$/i.exec(k);
+  if(!r) return null;
+  let row = 0; for(const c of r[1].toUpperCase()) row = row*26 + (c.charCodeAt(0)-64);
+  return { row: row-1, col: (+r[2])-1 };
+}
+
+/** Readouts we can compare. For a per-well file that's the pct_/n_ columns;
+ *  for a per-nucleus file we derive them from the stored positivity calls. */
+function buildMetrics(){
+  const h = S.header, out = [];
+  const skip = /^(well_row|well_col|field|image_id|label|y|x|bg_)/;
+  if(S.kind === "well"){
+    for(const c of h){
+      if(skip.test(c) || c === "well" || c === "plate") continue;
+      if(!(S.cols[c] instanceof Float64Array)) continue;
+      if(c.startsWith("kv_")) continue;              // metadata, not a readout
+      out.push({ key:c, label:c.replace(/_/g," "), agg:"first" });
+    }
+  } else {
+    out.push({ key:"__n", label:"cells per well", agg:"count" });
+    for(const c of h) if(/^pos_/.test(c))
+      out.push({ key:c, label:"% "+c.slice(4)+" positive", agg:"pctTrue" });
+    if(h.includes("population"))
+      for(const p of ["negative","single","double","triple","quadruple"])
+        if(new Set(S.cols["population"]).has(p))
+          out.push({ key:"__pop_"+p, label:"% "+p, agg:"pctPop" });
+    for(const c of h) if(/^(mean|median|integrated)_/.test(c))
+      out.push({ key:c, label:"mean "+c.replace(/_/g," ")+" per well", agg:"mean" });
+    for(const c of h) if(/^foci_n_/.test(c))
+      out.push({ key:c, label:"mean "+c.slice(7)+" foci per nucleus", agg:"mean" });
+  }
+  S.metrics = out;
+}
+
+/** The value of the current readout for one well. */
+function wellValue(w){
+  const rows = S.wellRows.get(w);
+  if(!rows || !rows.length) return NaN;
+  const m = S.metrics.find(x => x.key === S.metric);
+  if(!m) return NaN;
+  if(m.agg === "first") return S.cols[m.key][rows[0]];
+  if(m.agg === "count") return rows.length;
+  if(m.agg === "pctTrue"){
+    const v = S.cols[m.key]; let k = 0;
+    for(const i of rows) if(v[i] > 0.5) k++;
+    return 100*k/rows.length;
+  }
+  if(m.agg === "pctPop"){
+    const want = m.key.slice(6), v = S.cols["population"]; let k = 0;
+    for(const i of rows) if(v[i] === want) k++;
+    return 100*k/rows.length;
+  }
+  const v = S.cols[m.key]; let s = 0, n = 0;
+  for(const i of rows){ const x = v[i]; if(isFinite(x)){ s += x; n++; } }
+  return n ? s/n : NaN;
+}
+function wellN(w){
+  const rows = S.wellRows.get(w);
+  if(S.kind === "cell") return rows.length;
+  const c = S.cols["n_cells"];
+  return c ? c[rows[0]] : NaN;
+}
+
+/* ---------- groups ---------------------------------------- */
+function addGroup(name){
+  if(S.groups.length >= 12) return;
+  S.groups.push({ name: name || `Condition ${S.groups.length+1}` });
+  S.active = S.groups.length-1;
+}
+function groupWells(gi){ return S.wells.filter(w => S.assign.get(w) === gi); }
+function groupValues(gi){
+  return groupWells(gi).map(wellValue).filter(v => isFinite(v));
+}
+function gColor(i){ return css(GCOL[i % GCOL.length]); }
+
+/** Group automatically from a metadata column — the common case, since the
+ *  plate map usually already lives in OMERO as key–value pairs. */
+function autoGroup(col){
+  if(!col || !S.cols[col]) return;
+  const byVal = new Map();
+  for(const w of S.wells){
+    const rows = S.wellRows.get(w);
+    const v = String(S.cols[col][rows[0]]).trim();
+    if(!v || v === "NaN") continue;
+    if(!byVal.has(v)) byVal.set(v, []);
+    byVal.get(v).push(w);
+  }
+  const keys = [...byVal.keys()].sort(naturalCmp);
+  S.groups = []; S.assign = new Map();
+  keys.slice(0,12).forEach((k,i)=>{
+    S.groups.push({ name:k });
+    for(const w of byVal.get(k)) S.assign.set(w, i);
+  });
+  S.active = 0;
+  S.ref = guessControl(keys);
+}
+
+/** Sort so that a dose series reads as a dose series: "Cisplatin 3uM" comes
+ *  before "Cisplatin 10uM", which plain alphabetical ordering gets backwards. */
+function naturalCmp(a, b){
+  const rx = /(\d+(?:\.\d+)?)|(\D+)/g;
+  const A = String(a).toLowerCase().match(rx) || [];
+  const B = String(b).toLowerCase().match(rx) || [];
+  for(let i=0;i<Math.min(A.length,B.length);i++){
+    const na = parseFloat(A[i]), nb = parseFloat(B[i]);
+    if(isFinite(na) && isFinite(nb)){ if(na !== nb) return na-nb; }
+    else if(A[i] !== B[i]) return A[i] < B[i] ? -1 : 1;
+  }
+  return A.length - B.length;
+}
+/** The reference should default to the control, not to whatever sorts first. */
+function guessControl(names){
+  const rx = /\b(dmso|vehicle|veh|control|ctrl|untreated|unt|mock|none|blank|neg(ative)?)\b/i;
+  let i = names.findIndex(n => rx.test(n));
+  if(i >= 0) return i;
+  i = names.findIndex(n => /^0(\.0+)?\s*(um|nm|mm|%|)$/i.test(String(n).trim()));
+  if(i >= 0) return i;
+  return 0;
+}
+
+/* ---------- analysis -------------------------------------- */
+function analyse(){
+  const gs = S.groups.map((g,i)=>({
+    name:g.name, i, wells:groupWells(i), vals:groupValues(i) }));
+  const used = gs.filter(g => g.vals.length > 0);
+  const stats = used.map(g => {
+    const v = g.vals;
+    const ci = ciMean(v);
+    return { ...g, n:v.length, mean:mean(v), sd:sd(v), sem:sem(v),
+             median:median(v), lo:ci[0], hi:ci[1],
+             min:Math.min(...v), max:Math.max(...v) };
+  });
+
+  let omnibus = null;
+  if(stats.length > 2){
+    const arrays = stats.map(s => s.vals);
+    omnibus = S.test === "rank" ? { name:"Kruskal–Wallis", ...kruskal(arrays) }
+            : S.test === "student" ? { name:"one-way ANOVA", ...anova(arrays) }
+            : { name:"Welch’s ANOVA", ...welchAnova(arrays) };
+  }
+
+  // every pair, so the reference choice only affects the effect plot
+  const pairs = [];
+  for(let i=0;i<stats.length;i++) for(let j=i+1;j<stats.length;j++){
+    const A = stats[i], B = stats[j];
+    const t = S.test === "rank" ? mannWhitney(A.vals, B.vals)
+            : S.test === "student" ? studentT(A.vals, B.vals)
+            : welch(A.vals, B.vals);
+    const g = hedgesG(A.vals, B.vals);
+    const boot = (A.vals.length >= 2 && B.vals.length >= 2)
+      ? bootDiff(A.vals, B.vals, 4000, 1234) : { diff:A.mean-B.mean, lo:NaN, hi:NaN };
+    pairs.push({ a:A, b:B, p:t.p, stat:t.t ?? t.U, df:t.df,
+                 g:g.g, gLo:g.lo, gHi:g.hi, ...boot });
+  }
+  const ps = pairs.map(p => p.p);
+  const adj = S.corr === "holm" ? holm(ps) : S.corr === "bh" ? bh(ps) : ps.slice();
+  pairs.forEach((p,i)=> p.padj = adj[i]);
+
+  S.result = { stats, omnibus, pairs };
+  return S.result;
+}
+
+/* ---------- warnings -------------------------------------- */
+function warnings(){
+  const out = [];
+  const r = S.result; if(!r) return out;
+  const assigned = [...S.assign.values()].length;
+  if(!r.stats.length){
+    out.push(["bad","No conditions yet.",
+      "Click wells on the plate to paint them into the active condition, or pick a "+
+      "metadata column under <b>Auto-group by</b>."]);
+    return out;
+  }
+  const small = r.stats.filter(s => s.n < 3);
+  if(small.length) out.push(["warn",
+    `n &lt; 3 in ${small.map(s=>escapeHtml(s.name)).join(", ")}.`,
+    "With fewer than three wells a spread cannot be estimated, so the confidence "+
+    "intervals and p-values below are not meaningful. Treat those conditions as "+
+    "descriptive only."]);
+  const n2 = r.stats.filter(s => s.n === 3);
+  if(!small.length && n2.length) out.push(["warn",
+    "Only three wells per condition.",
+    "This is a common design but it is a weak one: a 95% interval from n = 3 is "+
+    "very wide, and a non-significant result says little either way. Read the "+
+    "effect size and its interval rather than the p-value."]);
+  const unassigned = S.wells.filter(w => !S.assign.has(w)).length;
+  if(unassigned) out.push(["warn",
+    `${unassigned} well${unassigned===1?"":"s"} not in any condition.`,
+    "They are excluded from every statistic here. That is fine if it was "+
+    "deliberate — just make sure it was."]);
+  if(r.stats.length > 2 && S.corr === "none" && r.pairs.length > 1) out.push(["warn",
+    `${r.pairs.length} pairwise tests with no correction.`,
+    "With several comparisons the chance of at least one false positive is well "+
+    "above 5%. Holm or Benjamini–Hochberg is the honest default."]);
+  return out;
+}
+const escapeHtml = s => String(s).replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- rendering: plate ------------------------------ */
+function drawPlate(){
+  const rcs = S.wells.map(wellRC), grid = rcs.every(Boolean);
+  const nCol = grid ? Math.max(...rcs.map(r=>r.col))+1 : 12;
+  const wsz = nCol <= 12 ? 22 : nCol <= 16 ? 17 : nCol <= 24 ? 11 : 8;
+  document.documentElement.style.setProperty("--wsz", wsz+"px");
+  const t = document.getElementById("plate");
+  t.style.borderSpacing = (wsz >= 17 ? 3 : 2)+"px";
+  const cell = w => {
+    const gi = S.assign.get(w);
+    const col = gi === undefined ? "var(--off)" : gColor(gi);
+    const lbl = (gi === undefined || wsz < 15) ? "" : String(gi+1);
+    const name = gi === undefined ? "unassigned" : S.groups[gi].name;
+    const v = wellValue(w);
+    return `<div class="well${gi===undefined?" unassigned":""}" data-w="${w}"
+      style="background:${col}" title="${w} — ${escapeHtml(name)}${
+        isFinite(v)?` — ${fmt(v)}`:""}">${lbl}</div>`;
+  };
+  let html = "";
+  if(grid){
+    const maxR = Math.max(...rcs.map(r=>r.row)), maxC = Math.max(...rcs.map(r=>r.col));
+    const at = new Map(); S.wells.forEach((k,i)=> at.set(rcs[i].row+":"+rcs[i].col, k));
+    html += "<tr><th></th>" + Array.from({length:maxC+1},(_,c)=>`<th>${c+1}</th>`).join("") + "</tr>";
+    for(let r=0;r<=maxR;r++){
+      html += `<tr><th>${String.fromCharCode(65+r)}</th>`;
+      for(let c=0;c<=maxC;c++){
+        const k = at.get(r+":"+c);
+        html += `<td>${k ? cell(k) : '<div class="well empty"></div>'}</td>`;
+      }
+      html += "</tr>";
+    }
+  } else {
+    html = "<tr>" + S.wells.map((k,i)=>
+      (i && i%12===0 ? "</tr><tr>" : "") + `<td>${cell(k)}</td>`).join("") + "</tr>";
+  }
+  t.innerHTML = html;
+  // click paints; drag paints a run of wells
+  let painting = false;
+  t.querySelectorAll(".well[data-w]").forEach(el=>{
+    const paint = () => {
+      if(!S.groups.length) return;
+      const w = el.dataset.w;
+      if(S.assign.get(w) === S.active) S.assign.delete(w);
+      else S.assign.set(w, S.active);
+      refresh();
+    };
+    el.addEventListener("pointerdown", e => { e.preventDefault(); painting = true; paint(); });
+    el.addEventListener("pointerenter", () => { if(painting && S.groups.length){
+      S.assign.set(el.dataset.w, S.active); refresh(); } });
+  });
+  addEventListener("pointerup", ()=>{ painting = false; }, { once:true });
+}
+const fmt = v => !isFinite(v) ? "–" : Math.abs(v) >= 1000 ? v.toFixed(0)
+  : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toPrecision(3);
+const fmtP = p => !isFinite(p) ? "–" : p < 1e-4 ? p.toExponential(1) : p.toFixed(4);
+
+/* ---------- rendering: superplot --------------------------- */
+/* Every well is drawn. Bar charts hide the spread that matters, and with
+   n = 3–6 the individual points ARE the evidence. (Lord et al., J Cell Biol
+   2020, made this the expected way to show replicate data.) */
+function drawSuper(){
+  const cv = document.getElementById("cSuper");
+  const W = cv.parentElement.clientWidth, H = 300, dpr = devicePixelRatio||1;
+  cv.width = W*dpr; cv.height = H*dpr; cv.style.height = H+"px";
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  const st = S.result ? S.result.stats : [];
+  if(!st.length){ note(g,W,H,"assign wells to conditions"); return; }
+
+  const padL = 52, padB = 44, padT = 14;
+  const all = st.flatMap(s => s.vals);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if(!(hi > lo)){ hi = lo + 1; lo -= 1; }
+  const pad = (hi-lo)*0.12; lo -= pad; hi += pad;
+  if(lo > 0 && lo < (hi-lo)*0.5) lo = 0;          // include zero when it's close
+  const Y = v => H-padB - (v-lo)/(hi-lo)*(H-padB-padT);
+  const bw = (W-padL-14)/st.length;
+
+  // y grid
+  g.strokeStyle = "#22303F"; g.fillStyle = css("--faint");
+  g.font = "10px "+css("--mono"); g.textAlign = "right";
+  for(let i=0;i<=4;i++){
+    const v = lo + (hi-lo)*i/4, y = Y(v);
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(W-6, y); g.stroke();
+    g.fillText(fmt(v), padL-7, y+3);
+  }
+  st.forEach((s,i)=>{
+    const x0 = padL + i*bw, cx = x0 + bw/2, col = gColor(s.i);
+    // 95% CI whisker, then the mean bar on top
+    if(isFinite(s.lo)){
+      g.strokeStyle = col; g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(cx, Y(s.lo)); g.lineTo(cx, Y(s.hi)); g.stroke();
+      for(const v of [s.lo,s.hi]){ g.beginPath();
+        g.moveTo(cx-7, Y(v)); g.lineTo(cx+7, Y(v)); g.stroke(); }
+    }
+    g.strokeStyle = col; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(cx-Math.min(26,bw*0.32), Y(s.mean));
+    g.lineTo(cx+Math.min(26,bw*0.32), Y(s.mean)); g.stroke();
+
+    // wells, deterministically jittered so overlapping points stay visible
+    const rnd = mulberry32(s.i*7919 + 13);
+    s.vals.forEach(v=>{
+      const jx = cx + (rnd()-0.5)*Math.min(bw*0.5, 34);
+      g.beginPath(); g.arc(jx, Y(v), 3.6, 0, 6.2832);
+      g.fillStyle = col+"CC"; g.fill();
+      g.strokeStyle = "#0B1017"; g.lineWidth = 1; g.stroke();
+    });
+    g.fillStyle = css("--ink"); g.font = "11px "+css("--sans"); g.textAlign = "center";
+    const nm = s.name.length > Math.floor(bw/7) ? s.name.slice(0,Math.floor(bw/7)-1)+"…" : s.name;
+    g.fillText(nm, cx, H-22);
+    g.fillStyle = s.n < 3 ? css("--warn") : css("--faint");
+    g.font = "10px "+css("--mono");
+    g.fillText(`n=${s.n}`, cx, H-8);
+  });
+  g.save(); g.translate(12, padT + (H-padB-padT)/2); g.rotate(-Math.PI/2);
+  g.fillStyle = css("--dim"); g.font = "10px "+css("--mono"); g.textAlign = "center";
+  g.fillText(metricLabel(), 0, 0); g.restore();
+  g.textAlign = "left";
+}
+
+/* ---------- rendering: estimation plot --------------------- */
+/* Differences with their intervals, on the scale of the measurement. A p-value
+   says only "probably not exactly zero"; this says how big and how uncertain. */
+function drawEffect(){
+  const cv = document.getElementById("cEffect");
+  const W = cv.parentElement.clientWidth, H = 300, dpr = devicePixelRatio||1;
+  cv.width = W*dpr; cv.height = H*dpr; cv.style.height = H+"px";
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  const r = S.result;
+  if(!r || r.stats.length < 2){ note(g,W,H,"needs two or more conditions"); return; }
+  const ref = r.stats.find(s => s.i === S.ref) || r.stats[0];
+  const others = r.stats.filter(s => s.i !== ref.i);
+  if(!others.length){ note(g,W,H,"needs a second condition"); return; }
+
+  const rows = others.map(o => {
+    const p = r.pairs.find(p =>
+      (p.a.i === o.i && p.b.i === ref.i) || (p.b.i === o.i && p.a.i === ref.i));
+    if(!p) return null;
+    const flip = p.a.i !== o.i;                       // always "other minus reference"
+    return { s:o, diff: flip ? -p.diff : p.diff,
+             lo: flip ? -p.hi : p.lo, hi: flip ? -p.lo : p.hi, padj:p.padj };
+  }).filter(Boolean);
+
+  const padL = 52, padB = 44, padT = 14;
+  const vals = rows.flatMap(x => [x.lo, x.hi, x.diff]).filter(isFinite);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  if(!(hi > lo)){ hi = lo + 1; }
+  const pad = (hi-lo)*0.15; lo -= pad; hi += pad;
+  const Y = v => H-padB - (v-lo)/(hi-lo)*(H-padB-padT);
+  const bw = (W-padL-14)/rows.length;
+
+  g.strokeStyle = "#22303F"; g.fillStyle = css("--faint");
+  g.font = "10px "+css("--mono"); g.textAlign = "right";
+  for(let i=0;i<=4;i++){
+    const v = lo + (hi-lo)*i/4, y = Y(v);
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(W-6, y); g.stroke();
+    g.fillText(fmt(v), padL-7, y+3);
+  }
+  // the "no difference" line is the thing every interval is judged against
+  g.strokeStyle = css("--faint"); g.setLineDash([5,4]); g.lineWidth = 1.2;
+  g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W-6, Y(0)); g.stroke();
+  g.setLineDash([]);
+
+  rows.forEach((x,i)=>{
+    const cx = padL + i*bw + bw/2, col = gColor(x.s.i);
+    const crosses = !(x.lo > 0 || x.hi < 0);
+    if(isFinite(x.lo)){
+      g.strokeStyle = col; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(cx, Y(x.lo)); g.lineTo(cx, Y(x.hi)); g.stroke();
+      for(const v of [x.lo,x.hi]){ g.beginPath();
+        g.moveTo(cx-6, Y(v)); g.lineTo(cx+6, Y(v)); g.stroke(); }
+    }
+    g.beginPath(); g.arc(cx, Y(x.diff), 5.5, 0, 6.2832);
+    g.fillStyle = crosses ? "#0B1017" : col; g.fill();
+    g.strokeStyle = col; g.lineWidth = 2; g.stroke();
+    g.fillStyle = css("--ink"); g.font = "11px "+css("--sans"); g.textAlign = "center";
+    const nm = x.s.name.length > Math.floor(bw/7) ? x.s.name.slice(0,Math.floor(bw/7)-1)+"…" : x.s.name;
+    g.fillText(nm, cx, H-22);
+    g.fillStyle = css("--faint"); g.font = "10px "+css("--mono");
+    g.fillText(fmt(x.diff), cx, H-8);
+  });
+  g.save(); g.translate(12, padT + (H-padB-padT)/2); g.rotate(-Math.PI/2);
+  g.fillStyle = css("--dim"); g.font = "10px "+css("--mono"); g.textAlign = "center";
+  g.fillText("difference vs "+ref.name, 0, 0); g.restore();
+  g.textAlign = "left";
+  document.getElementById("effCap").textContent =
+    `each condition minus ${ref.name} · bootstrap 95% CI · hollow = interval includes zero`;
+}
+function note(g,W,H,msg){
+  g.fillStyle = css("--faint"); g.font = "11px "+css("--mono");
+  g.textAlign = "center"; g.fillText(msg, W/2, H/2); g.textAlign = "left";
+}
+function metricLabel(){
+  const m = S.metrics.find(x => x.key === S.metric);
+  return m ? m.label : "";
+}
+
+/* ---------- rendering: tables ------------------------------ */
+function drawTables(){
+  const r = S.result;
+  const gt = document.getElementById("tGroup");
+  if(!r || !r.stats.length){ gt.innerHTML = ""; document.getElementById("tPair").innerHTML = "";
+    document.getElementById("tWell").innerHTML = ""; return; }
+
+  gt.innerHTML = "<thead><tr>" +
+    ["condition","wells (n)","cells","mean","SD","SEM","95% CI","median","min","max"]
+      .map(h=>`<th>${h}</th>`).join("") + "</tr></thead><tbody>" +
+    r.stats.map(s=>{
+      const cells = s.wells.reduce((a,w)=>a+(wellN(w)||0),0);
+      return `<tr><td><span class="pill" style="border-color:${gColor(s.i)};color:${gColor(s.i)}">${
+        escapeHtml(s.name)}</span></td>`+
+        `<td${s.n<3?' style="color:var(--warn)"':''}>${s.n}</td>`+
+        `<td>${cells?cells.toLocaleString():"–"}</td>`+
+        `<td>${fmt(s.mean)}</td><td>${fmt(s.sd)}</td><td>${fmt(s.sem)}</td>`+
+        `<td>${isFinite(s.lo)?`${fmt(s.lo)} – ${fmt(s.hi)}`:"–"}</td>`+
+        `<td>${fmt(s.median)}</td><td>${fmt(s.min)}</td><td>${fmt(s.max)}</td></tr>`;
+    }).join("") + "</tbody>";
+
+  const pt = document.getElementById("tPair");
+  const statName = S.test === "rank" ? "U" : "t";
+  pt.innerHTML = r.pairs.length ? "<thead><tr>" +
+    ["comparison","difference","95% CI of difference","Hedges g","95% CI of g",
+     statName, "p", S.corr==="none"?"p":"p adjusted", ""].map(h=>`<th>${h}</th>`).join("") +
+    "</tr></thead><tbody>" + r.pairs.map(p=>{
+      const sig = isFinite(p.padj) && p.padj < 0.05;
+      return `<tr><td>${escapeHtml(p.a.name)} vs ${escapeHtml(p.b.name)}</td>`+
+        `<td>${fmt(p.diff)}</td>`+
+        `<td>${isFinite(p.lo)?`${fmt(p.lo)} – ${fmt(p.hi)}`:"–"}</td>`+
+        `<td>${fmt(p.g)}</td>`+
+        `<td>${isFinite(p.gLo)?`${fmt(p.gLo)} – ${fmt(p.gHi)}`:"–"}</td>`+
+        `<td>${fmt(p.stat)}</td><td>${fmtP(p.p)}</td>`+
+        `<td class="sig ${sig?"y":"n"}">${fmtP(p.padj)}</td>`+
+        `<td class="sig ${sig?"y":"n"}">${sig?"*":"ns"}</td></tr>`;
+    }).join("") + "</tbody>" : "";
+
+  const wt = document.getElementById("tWell");
+  wt.innerHTML = "<thead><tr>" + ["well","condition","cells",metricLabel()]
+      .map(h=>`<th>${h}</th>`).join("") + "</tr></thead><tbody>" +
+    S.wells.map(w=>{
+      const gi = S.assign.get(w);
+      return `<tr><td>${w}</td><td>${gi===undefined
+        ? '<span style="color:var(--faint)">—</span>'
+        : `<span class="pill" style="border-color:${gColor(gi)};color:${gColor(gi)}">${
+            escapeHtml(S.groups[gi].name)}</span>`}</td>`+
+        `<td>${isFinite(wellN(w))?wellN(w).toLocaleString():"–"}</td>`+
+        `<td>${fmt(wellValue(w))}</td></tr>`;
+    }).join("") + "</tbody>";
+  document.getElementById("wellNote").textContent =
+    `${S.wells.length} wells · ${S.assign.size} assigned`;
+}
+
+/* ---------- refresh --------------------------------------- */
+function refresh(){
+  analyse();
+  drawPlate(); drawGroups(); drawSuper(); drawEffect(); drawTables();
+
+  const r = S.result;
+  document.getElementById("sWells").textContent = `${S.assign.size}/${S.wells.length}`;
+  document.getElementById("sGroups").textContent = r.stats.length;
+  const ns = r.stats.map(s=>s.n);
+  document.getElementById("sDesign").textContent = ns.length
+    ? `n = ${ns.every(x=>x===ns[0]) ? ns[0] : ns.join("/")} wells` : "—";
+  document.getElementById("ovNote").textContent = metricLabel();
+
+  const om = document.getElementById("omni");
+  if(r.omnibus && isFinite(r.omnibus.p)){
+    const o = r.omnibus;
+    om.textContent = o.H !== undefined
+      ? `${o.name}: H = ${o.H.toFixed(3)}, df = ${o.df}, p = ${fmtP(o.p)}`
+      : `${o.name}: F(${o.df1.toFixed(0)}, ${o.df2.toFixed(1)}) = ${o.F.toFixed(3)}, p = ${fmtP(o.p)}`;
+  } else om.textContent = r.stats.length === 2 ? "two conditions — pairwise test only" : "";
+
+  document.getElementById("testNote").innerHTML =
+    S.test === "rank"
+      ? "Rank-based tests make no assumption about the shape of the distribution, "+
+        "but with very few wells they have little power and cannot return a small p."
+      : S.test === "student"
+      ? "Student's t and one-way ANOVA assume equal variance between conditions. "+
+        "If a treatment changes the spread as well as the mean — common — prefer Welch."
+      : "Welch does not assume equal variances, which is why it is the default. "+
+        "It costs almost nothing when variances happen to be equal.";
+
+  const wb = document.getElementById("warnings");
+  wb.innerHTML = warnings().map(([k,h,b])=>
+    `<div class="warn${k==="bad"?" bad":""}"><b>${h}</b> ${b}</div>`).join("");
+  syncSelectors();
+}
+function drawGroups(){
+  const box = document.getElementById("groups");
+  box.innerHTML = S.groups.map((g,i)=>{
+    const n = groupWells(i).length;
+    return `<div class="grp${i===S.active?" active":""}" data-g="${i}">
+      <span class="sw" style="background:${gColor(i)}"></span>
+      <input class="nm" data-nm="${i}" value="${escapeHtml(g.name)}">
+      <span class="ct${n<3?" low":""}">${n} well${n===1?"":"s"}</span>
+      <button class="rm" data-rm="${i}" title="remove">×</button></div>`;
+  }).join("") || `<div class="hint">No conditions yet — press <b>+ add</b>, or
+    auto-group from a metadata column below.</div>`;
+  box.querySelectorAll("[data-g]").forEach(el=>{
+    el.onclick = e => { if(e.target.matches("input,button")) return;
+      S.active = +el.dataset.g; refresh(); };
+  });
+  box.querySelectorAll("[data-nm]").forEach(inp=>{
+    inp.onchange = () => { S.groups[+inp.dataset.nm].name = inp.value.trim() ||
+      `Condition ${+inp.dataset.nm+1}`; refresh(); };
+    inp.onclick = e => e.stopPropagation();
+  });
+  box.querySelectorAll("[data-rm]").forEach(b=>{
+    b.onclick = e => { e.stopPropagation();
+      const gi = +b.dataset.rm;
+      S.groups.splice(gi,1);
+      const next = new Map();
+      for(const [w,g] of S.assign){ if(g === gi) continue;
+        next.set(w, g > gi ? g-1 : g); }
+      S.assign = next;
+      S.active = Math.max(0, Math.min(S.active, S.groups.length-1));
+      S.ref = Math.max(0, Math.min(S.ref, S.groups.length-1));
+      refresh(); };
+  });
+  document.getElementById("paintHint").innerHTML = S.groups.length
+    ? `Click or drag wells to paint them into <b style="color:${gColor(S.active)}">${
+        escapeHtml(S.groups[S.active].name)}</b>. Click again to unassign.`
+    : "Add a condition first, then click wells to assign them.";
+}
+function syncSelectors(){
+  const ref = document.getElementById("ref");
+  const cur = S.ref;
+  ref.innerHTML = S.groups.map((g,i)=>
+    `<option value="${i}"${i===cur?" selected":""}>${escapeHtml(g.name)}</option>`).join("");
+  ref.value = String(cur);
+}
+
+/* ---------- export ---------------------------------------- */
+function exportReport(){
+  const r = S.result;
+  if(!r || !r.stats.length) return;
+  const L = [];
+  const q = s => `"${String(s).replace(/"/g,'""')}"`;
+  L.push("# Condition Explorer report");
+  L.push(`# source,${q(S.name)}`);
+  L.push(`# plate,${q(S.plate)}`);
+  L.push(`# readout,${q(metricLabel())}`);
+  L.push(`# unit of replication,well`);
+  L.push(`# test,${q(document.getElementById("test").selectedOptions[0].text)}`);
+  L.push(`# multiple-comparison correction,${q(S.corr)}`);
+  L.push(`# exported,${new Date().toISOString()}`);
+  L.push("");
+  L.push("## per condition");
+  L.push(["condition","n_wells","n_cells","mean","sd","sem","ci_lo","ci_hi",
+          "median","min","max","wells"].join(","));
+  for(const s of r.stats)
+    L.push([q(s.name), s.n, s.wells.reduce((a,w)=>a+(wellN(w)||0),0),
+      s.mean, s.sd, s.sem, s.lo, s.hi, s.median, s.min, s.max,
+      q(s.wells.join(" "))].join(","));
+  L.push("");
+  if(r.omnibus && isFinite(r.omnibus.p)){
+    L.push("## omnibus");
+    L.push("test,statistic,df1,df2,p");
+    const o = r.omnibus;
+    L.push([q(o.name), o.H ?? o.F, o.df ?? o.df1, o.df2 ?? "", o.p].join(","));
+    L.push("");
+  }
+  L.push("## pairwise");
+  L.push(["group_a","group_b","difference","diff_ci_lo","diff_ci_hi",
+          "hedges_g","g_ci_lo","g_ci_hi","statistic","df","p","p_adjusted"].join(","));
+  for(const p of r.pairs)
+    L.push([q(p.a.name), q(p.b.name), p.diff, p.lo, p.hi, p.g, p.gLo, p.gHi,
+            p.stat, p.df ?? "", p.p, p.padj].join(","));
+  L.push("");
+  L.push("## wells");
+  L.push(["well","condition","n_cells","value"].join(","));
+  for(const w of S.wells){
+    const gi = S.assign.get(w);
+    if(gi === undefined) continue;
+    L.push([w, q(S.groups[gi].name), wellN(w), wellValue(w)].join(","));
+  }
+  const blob = new Blob([L.join("\n")], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (S.name.replace(/\.(csv|gz|tsv|txt)+$/i,"") || "conditions") + "_conditions.csv";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ---------- load ------------------------------------------ */
+const errEl = document.getElementById("err");
+const busy = on => document.getElementById("busy").classList.toggle("on", on);
+
+async function load(file){
+  errEl.textContent = ""; busy(true);
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    const buf = await file.arrayBuffer();
+    const head = new Uint8Array(buf,0,2);
+    const gz = file.name.toLowerCase().endsWith(".gz") || (head[0]===0x1f && head[1]===0x8b);
+    let text;
+    if(gz){
+      if(typeof pako === "undefined") throw new Error(
+        "This file is gzipped and the decompressor didn't load (no internet?). "+
+        "Use a plain .csv, or unzip it first.");
+      text = pako.inflate(new Uint8Array(buf), {to:"string"});
+    } else text = new TextDecoder().decode(buf);
+
+    const p = parseCSV(text);
+    S.name = file.name; S.header = p.header; S.cols = p.cols; S.rows = p.rows;
+    S.groups = []; S.assign = new Map(); S.active = 0; S.ref = 0;
+    detect();
+    buildUI();
+    // if the file carries condition metadata, start from it
+    const auto = document.getElementById("autoCol");
+    if(auto.value) autoGroup(auto.value);
+    document.getElementById("sFile").textContent = file.name +
+      (S.kind === "cell" ? "  (per-nucleus)" : "  (per-well)");
+    document.getElementById("drop").classList.add("hide");
+    document.getElementById("app").classList.add("ready");
+    refresh();
+  }catch(e){
+    errEl.textContent = e.message || String(e); console.error(e);
+  }finally{ busy(false); }
+}
+function buildUI(){
+  const m = document.getElementById("metric");
+  m.innerHTML = S.metrics.map(x=>
+    `<option value="${x.key}">${escapeHtml(x.label)}</option>`).join("");
+  m.value = S.metric;
+  m.onchange = () => { S.metric = m.value; refresh(); };
+
+  // columns that look like condition labels: metadata, or anything with a
+  // small number of repeated values across wells
+  const cand = [];
+  for(const c of S.header){
+    if(["well","plate","field","image_id","label"].includes(c)) continue;
+    const vals = new Set();
+    for(const w of S.wells) vals.add(String(S.cols[c][S.wellRows.get(w)[0]]));
+    if(vals.size >= 2 && vals.size <= Math.max(2, Math.min(12, S.wells.length/2)))
+      cand.push([c, vals.size]);
+  }
+  cand.sort((a,b)=> (a[0].startsWith("kv_") === b[0].startsWith("kv_"))
+    ? a[1]-b[1] : (a[0].startsWith("kv_") ? -1 : 1));
+  const ac = document.getElementById("autoCol");
+  ac.innerHTML = `<option value="">— pick a column —</option>` + cand.map(([c,n])=>
+    `<option value="${c}">${escapeHtml(c)} (${n} values)</option>`).join("");
+  if(cand.length) ac.value = cand[0][0];
+  ac.onchange = () => { if(ac.value){ autoGroup(ac.value); refresh(); } };
+
+  const pl = document.getElementById("plateName");
+  pl.textContent = S.plates.length > 1 ? S.plate + ` (1 of ${S.plates.length})` : S.plate;
+}
+
+/* ---------- wiring ---------------------------------------- */
+const fileInput = document.getElementById("file");
+document.getElementById("pick").onclick = () => fileInput.click();
+fileInput.onchange = () => fileInput.files[0] && load(fileInput.files[0]);
+const dz = document.getElementById("dz");
+["dragenter","dragover"].forEach(e => document.addEventListener(e, ev=>{
+  ev.preventDefault(); dz.classList.add("hot"); }));
+document.addEventListener("dragleave", ev=>{ if(ev.relatedTarget===null) dz.classList.remove("hot"); });
+document.addEventListener("drop", ev=>{ ev.preventDefault(); dz.classList.remove("hot");
+  const f = ev.dataTransfer.files[0]; if(f) load(f); });
+
+document.getElementById("addGrp").onclick = () => { addGroup(); refresh(); };
+document.getElementById("bClear").onclick = () => {
+  S.groups = []; S.assign = new Map(); S.active = 0; S.ref = 0; refresh(); };
+document.getElementById("bAuto").onclick = () => {
+  const ac = document.getElementById("autoCol");
+  if(ac.value){ autoGroup(ac.value); refresh(); }
+  else errToast("Pick a column under “Auto-group by” first.");
+};
+document.getElementById("ref").onchange = e => { S.ref = +e.target.value; refresh(); };
+document.getElementById("test").onchange = e => { S.test = e.target.value; refresh(); };
+document.getElementById("corr").onchange = e => { S.corr = e.target.value; refresh(); };
+document.getElementById("bExport").onclick = exportReport;
+document.getElementById("bNew").onclick = () => {
+  document.getElementById("app").classList.remove("ready");
+  document.getElementById("drop").classList.remove("hide");
+  fileInput.value = ""; };
+function errToast(msg){ const w = document.getElementById("warnings");
+  w.innerHTML = `<div class="warn"><b>${msg}</b></div>` + w.innerHTML; }
+
+let rt; addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(()=>{
+  if(document.getElementById("app").classList.contains("ready")){
+    drawSuper(); drawEffect(); } }, 150); });
+
+if(window.EMBEDDED_CSV)
+  load(new File([window.EMBEDDED_CSV], window.EMBEDDED_NAME || "embedded.csv"));
+
+</script>
+</body>
+</html>
