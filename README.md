@@ -1,4 +1,4 @@
-# nucleoflow
+# NucleoGate
 
 **Flow-cytometry-style analysis of high-content microscopy: nuclear
 segmentation, multi-marker gating, foci counting and dose-response, straight
@@ -1884,42 +1884,3 @@ files afterwards — they have identical columns, so in pandas:
 | parquet | A compressed table format; smaller and much faster than CSV |
 | CLI flag | The `--something` options you type after the script name |
 
-
----
-
-## Setting up the repository
-
-If you're the one publishing this, GitHub's **topics** are how people find a
-tool like this — they're indexed by GitHub search and by the topic pages, in a
-way that README text is not.
-
-**In the browser:** open the repository, click the **⚙ gear** next to *About* on
-the right-hand side, and fill in the *Description*, *Website* and *Topics*
-fields. Topics are lowercase, hyphen-separated, and you can have up to 20.
-
-**From the command line**, with the [GitHub CLI](https://cli.github.com):
-
-```bash
-gh repo edit --add-topic omero,high-content-screening,microscopy,image-analysis
-gh repo edit --add-topic image-cytometry,cell-segmentation,stardist,cellpose
-gh repo edit --add-topic flow-cytometry,gating,high-throughput-screening
-gh repo edit --add-topic bioimage-analysis,python,imagexpress
-gh repo edit --description "Flow-cytometry-style analysis of high-content microscopy: nuclear segmentation, multi-marker gating and foci counting, straight from OMERO"
-```
-
-(`--add-topic` takes a comma-separated list and can be repeated; splitting it
-across a few lines just keeps it readable.)
-
-Two things worth doing at the same time:
-
-- **Point the *Website* field** at the raw `gating_explorer.html` if you host it
-  anywhere, or at the docs. If you enable GitHub Pages for the repository, the
-  two explorers work as-is from a Pages URL — they're plain static HTML with no
-  build step and no server, so students could use them without cloning anything.
-- **Add a `CITATION.cff`** if this ends up supporting a paper. GitHub renders a
-  "Cite this repository" button from it automatically.
-
-A note on licensing: the pipeline depends on StarDist and Cellpose, which carry
-their own licences (BSD-3-Clause with a non-commercial clause, and BSD-3-Clause
-respectively). Worth checking those before choosing yours, particularly if
-anyone downstream might want commercial use.
