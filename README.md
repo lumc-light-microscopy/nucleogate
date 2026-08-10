@@ -1,24 +1,63 @@
-# NucleoGate
+# nucleoflow
 
 **Flow-cytometry-style analysis of high-content microscopy: nuclear
-segmentation, multi-marker gating and foci counting, straight from OMERO.**
+segmentation, multi-marker gating, foci counting and dose-response, straight
+from OMERO.**
 
-Two things live here:
+---
 
-1. **A Python pipeline** (`omero_nuclei_flow.py`) that takes ImageXpress
-   high-content images stored in OMERO as **Screens**, finds every nucleus,
-   measures how bright each nucleus is in every channel, decides which cells are
-   "positive" for each marker, counts γ-H2AX-style foci if you want it to, and
-   writes flow-cytometry-style plots and spreadsheets.
-2. **Two browser tools** — `gating_explorer.html` and
-   `condition_explorer.html` — single HTML files with **nothing to install**.
-   Open one, drop in a results file, and re-gate by hand or group replicate
-   wells into conditions and test between them. They are the part most students
-   will actually use, and they run entirely on your own machine.
+## Start here: the workbench
+
+**`nucleoflow_workbench.html` — one file, nothing to install.** Double-click it,
+drop in a results file, and you have the whole analysis in two tabs:
+
+| Tab | What you do there |
+|---|---|
+| **1 · Gating** | filter out debris and dying cells, drag the marker gates, see the populations per well |
+| **2 · Conditions & IC50** | group replicate wells, compare conditions, run two-way ANOVA, fit IC50 curves — per compound *and* per cell population |
+
+Both tabs work on the **same cells**, so a gate you move on tab 1 changes the
+IC50s on tab 2. That link is the point: splitting a dose-response by cell
+population needs a positivity call for every cell, and tab 1 is where those come
+from. Nothing leaves your computer — the browser reads the file locally.
+
+If you are handing one thing to a student, hand them this. See
+[`WORKBENCH_GUIDE.md`](WORKBENCH_GUIDE.md).
+
+## What produces the data
+
+**`omero_nuclei_flow.py`** takes ImageXpress high-content images stored in OMERO
+as **Screens**, finds every nucleus with StarDist or Cellpose, measures its
+brightness in every channel, decides which cells are positive for each marker,
+counts γ-H2AX-style foci if you want it to, and writes the tables and plots the
+workbench then reads.
 
 In one sentence: **it turns a plate of images into the kind of table and plots
 you'd get from a flow cytometer, except every event is a nucleus you can go back
 and look at.**
+
+```bash
+conda env create -f environment.yml && conda activate omeroflow
+python omero_nuclei_flow.py --check-env
+python omero_nuclei_flow.py --host omero.example.org --user you \
+    --screen-id 1234 --export-explorer --outdir ./results
+```
+
+`--export-explorer` writes a copy of the browser tool next to the results with
+your data already inside it, so there is nothing to load by hand.
+
+Full instructions, written for someone who has never opened a terminal, start at
+[section 2](#2-opening-a-terminal).
+
+## The standalone tools
+
+The two halves of the workbench also exist on their own, for when you only need
+one:
+
+- **`gating_explorer.html`** — gating and populations only.
+- **`condition_explorer.html`** — conditions, ANOVA and IC50 only. Use this if
+  your file already carries the gates you want, or if you are working from a
+  `per_well_summary.csv`.
 
 ---
 
@@ -26,16 +65,17 @@ and look at.**
 
 | File | What it's for |
 |---|---|
-| `omero_nuclei_flow.py` | the analysis script — everything is in here |
+| **`nucleoflow_workbench.html`** | **the main tool** — gating and analysis in one file, two tabs, one dataset |
+| `WORKBENCH_GUIDE.md` | guide to the combined workflow |
+| `omero_nuclei_flow.py` | the pipeline that turns OMERO images into the tables the workbench reads |
 | `environment.yml` | pinned conda environment (StarDist / TensorFlow 2.10 / Python 3.10) |
 | `environment-cellpose.yml` | alternative environment (Cellpose / PyTorch, no version ceiling) |
 | `requirements.txt` | the same pins for pip, if you can't use conda |
-| `gating_explorer.html` | interactive browser tool for post-hoc re-gating (no install) |
+| `gating_explorer.html` | the gating half on its own |
 | `EXPLORER_GUIDE.md` | student-facing guide to the gating explorer |
-| `nucleoflow_workbench.html` | **both explorers in one file, as two tabs over one dataset** — gate on tab 1, analyse on tab 2 |
-| `WORKBENCH_GUIDE.md` | guide to the combined workflow |
-| `condition_explorer.html` | group replicate wells into conditions and compare them |
+| `condition_explorer.html` | the analysis half on its own |
 | `CONDITION_EXPLORER_GUIDE.md` | guide to the condition explorer |
+| `build_workbench.py` | rebuilds the workbench from the two standalone files |
 | `WINDOWS_LATEST_TENSORFLOW.md` | short guide to running current TensorFlow on Windows via WSL2 |
 | `README.md` | this file |
 
@@ -1844,3 +1884,42 @@ files afterwards — they have identical columns, so in pandas:
 | parquet | A compressed table format; smaller and much faster than CSV |
 | CLI flag | The `--something` options you type after the script name |
 
+
+---
+
+## Setting up the repository
+
+If you're the one publishing this, GitHub's **topics** are how people find a
+tool like this — they're indexed by GitHub search and by the topic pages, in a
+way that README text is not.
+
+**In the browser:** open the repository, click the **⚙ gear** next to *About* on
+the right-hand side, and fill in the *Description*, *Website* and *Topics*
+fields. Topics are lowercase, hyphen-separated, and you can have up to 20.
+
+**From the command line**, with the [GitHub CLI](https://cli.github.com):
+
+```bash
+gh repo edit --add-topic omero,high-content-screening,microscopy,image-analysis
+gh repo edit --add-topic image-cytometry,cell-segmentation,stardist,cellpose
+gh repo edit --add-topic flow-cytometry,gating,high-throughput-screening
+gh repo edit --add-topic bioimage-analysis,python,imagexpress
+gh repo edit --description "Flow-cytometry-style analysis of high-content microscopy: nuclear segmentation, multi-marker gating and foci counting, straight from OMERO"
+```
+
+(`--add-topic` takes a comma-separated list and can be repeated; splitting it
+across a few lines just keeps it readable.)
+
+Two things worth doing at the same time:
+
+- **Point the *Website* field** at the raw `gating_explorer.html` if you host it
+  anywhere, or at the docs. If you enable GitHub Pages for the repository, the
+  two explorers work as-is from a Pages URL — they're plain static HTML with no
+  build step and no server, so students could use them without cloning anything.
+- **Add a `CITATION.cff`** if this ends up supporting a paper. GitHub renders a
+  "Cite this repository" button from it automatically.
+
+A note on licensing: the pipeline depends on StarDist and Cellpose, which carry
+their own licences (BSD-3-Clause with a non-commercial clause, and BSD-3-Clause
+respectively). Worth checking those before choosing yours, particularly if
+anyone downstream might want commercial use.

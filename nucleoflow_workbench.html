@@ -2108,7 +2108,7 @@ let rt; addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(()=>{
   if(document.getElementById("app").classList.contains("ready")) refresh(); }, 140); });
 
 // If data was embedded by --export-explorer, load it without a file dialog.
-if(window.EMBEDDED_CSV){
+if(false && window.EMBEDDED_CSV){
   const blob = new File([window.EMBEDDED_CSV], window.EMBEDDED_NAME || "embedded.csv");
   load(blob);
 }
@@ -5014,7 +5014,7 @@ let rt; addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(()=>{
   if(document.getElementById("app").classList.contains("ready")){
     drawSuper(); drawEffect(); } }, 150); });
 
-if(window.EMBEDDED_CSV)
+if(false && window.EMBEDDED_CSV)
   load(new File([window.EMBEDDED_CSV], window.EMBEDDED_NAME || "embedded.csv"));
 
 
@@ -5219,6 +5219,13 @@ async function loadFile(file){
     $("wbErr").textContent = e.message || String(e);
     console.error(e);
   }finally{ busy(false); }
+}
+
+// Data embedded by --export-explorer: load it once, through the shell.
+// The brace here is deliberate - write_explorer() anchors its injection on
+// the exact opening string that write_explorer() looks for.
+if(window.EMBEDDED_CSV){
+  loadFile(new File([window.EMBEDDED_CSV], window.EMBEDDED_NAME || "embedded.csv"));
 }
 
 $("wbPick").onclick = () => $("wbFileInput").click();

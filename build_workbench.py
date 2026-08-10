@@ -102,6 +102,17 @@ def main():
     gcss_s = scope_css(strip_root(gcss), "pane-gate", "G-")
     ccss_s = scope_css(strip_root(ccss), "pane-cond", "C-")
 
+    # Each standalone app self-loads window.EMBEDDED_CSV. In the merged file
+    # that would make both panes parse the CSV separately, giving them
+    # independent column objects and silently breaking the shared dataset the
+    # workbench exists for. The shell loads it once instead.
+    kill = "if(window.EMBEDDED_CSV)"
+    gjs_n = gjs.replace(kill, "if(false && window.EMBEDDED_CSV)")
+    cjs_n = cjs.replace(kill, "if(false && window.EMBEDDED_CSV)")
+    if kill in gjs and "if(false && window.EMBEDDED_CSV)" not in gjs_n:
+        raise SystemExit("failed to neutralise the gating pane's embedded hook")
+    gjs, cjs = gjs_n, cjs_n
+
     gbody_p = prefix_ids(gbody, "G-")
     cbody_p = prefix_ids(cbody, "C-")
 
@@ -464,6 +475,13 @@ async function loadFile(file){{
     $("wbErr").textContent = e.message || String(e);
     console.error(e);
   }}finally{{ busy(false); }}
+}}
+
+// Data embedded by --export-explorer: load it once, through the shell.
+// The brace here is deliberate - write_explorer() anchors its injection on
+// the exact opening string that write_explorer() looks for.
+if(window.EMBEDDED_CSV){{
+  loadFile(new File([window.EMBEDDED_CSV], window.EMBEDDED_NAME || "embedded.csv"));
 }}
 
 $("wbPick").onclick = () => $("wbFileInput").click();

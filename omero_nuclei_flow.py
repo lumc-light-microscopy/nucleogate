@@ -1616,25 +1616,29 @@ def attach_file(conn, obj, path: Path, ns="omero_nuclei_flow"):
 # --------------------------------------------------------------------------- #
 
 
-EXPLORER_NAME = "gating_explorer.html"
+# Prefer the combined workbench — it contains the gating tool plus the
+# condition/IC50 analysis — and fall back to the gating explorer alone.
+EXPLORER_NAMES = ("nucleoflow_workbench.html", "gating_explorer.html")
 
 
 def write_explorer(df: pd.DataFrame, outdir: Path, tag: str,
                    embed: bool = True) -> Optional[Path]:
     """Copy the interactive explorer next to the results, data optionally inlined.
 
-    Looks for gating_explorer.html beside this script. Embedding makes the
-    output a single file a student can double-click - no file dialog, no server,
-    no Python. Above ~80 MB of CSV we skip embedding, because the browser has to
-    hold the string and the parsed columns at once.
+    Looks beside this script for nucleoflow_workbench.html, then for
+    gating_explorer.html. Embedding makes the output a single file a student can
+    double-click - no file dialog, no server, no Python. Above ~80 MB of CSV we
+    skip embedding, because the browser has to hold the string and the parsed
+    columns at once.
     """
-    src = Path(__file__).resolve().parent / EXPLORER_NAME
-    if not src.exists():
-        LOG.warning("Explorer template not found next to the script (%s) - "
-                    "skipping --export-explorer", src)
+    here = Path(__file__).resolve().parent
+    src = next((here / n for n in EXPLORER_NAMES if (here / n).exists()), None)
+    if src is None:
+        LOG.warning("No explorer template found next to the script (looked for "
+                    "%s) - skipping --export-explorer", " or ".join(EXPLORER_NAMES))
         return None
     html = src.read_text(encoding="utf-8")
-    dest = outdir / EXPLORER_NAME
+    dest = outdir / src.name
 
     if embed:
         csv = df.to_csv(index=False)
@@ -2543,8 +2547,9 @@ def parse_args(argv=None) -> Config:
     g.add_argument("--save-foci-table", action="store_true",
                    help="also write one row per detected focus")
     g.add_argument("--export-explorer", action="store_true",
-                   help="write gating_explorer.html next to the results, with "
-                        "the per-nucleus data embedded, for interactive re-gating")
+                   help="write the browser tool (nucleoflow_workbench.html if "
+                        "present, else gating_explorer.html) next to the results "
+                        "with the per-nucleus data embedded")
     g.add_argument("--explorer-no-embed", action="store_true",
                    help="write the explorer without inlining the data "
                         "(smaller file; drop the CSV in by hand)")
