@@ -1,4 +1,4 @@
-# nucleogate
+# nucleoflow
 
 **Flow-cytometry-style analysis of high-content microscopy: nuclear
 segmentation, multi-marker gating and foci counting, straight from OMERO.**
@@ -32,6 +32,8 @@ and look at.**
 | `requirements.txt` | the same pins for pip, if you can't use conda |
 | `gating_explorer.html` | interactive browser tool for post-hoc re-gating (no install) |
 | `EXPLORER_GUIDE.md` | student-facing guide to the gating explorer |
+| `nucleoflow_workbench.html` | **both explorers in one file, as two tabs over one dataset** — gate on tab 1, analyse on tab 2 |
+| `WORKBENCH_GUIDE.md` | guide to the combined workflow |
 | `condition_explorer.html` | group replicate wells into conditions and compare them |
 | `CONDITION_EXPLORER_GUIDE.md` | guide to the condition explorer |
 | `WINDOWS_LATEST_TENSORFLOW.md` | short guide to running current TensorFlow on Windows via WSL2 |
@@ -775,6 +777,24 @@ is the practical ceiling.
 `EXPLORER_GUIDE.md` is written for students, and includes a section on the ways
 interactive gating invites you to fool yourself.
 
+### One file, two tabs: the workbench
+
+`nucleoflow_workbench.html` contains both explorers as tabs over a **single
+shared dataset**. It exists because splitting IC50s by cell population needs a
+positivity call per cell, and on its own the condition explorer can only use
+whatever `pos_*` columns the pipeline stored — with no way to change them.
+
+In the workbench, tab 1 creates those columns from live gates. Drag the GFP gate
+from 282 to 2000 and the marker goes from 26.8% to 13.2% positive, and the
+per-population IC50s on tab 2 change with it. Press **Apply gates →** to push
+the current calls through.
+
+A `per_well_summary.csv` still loads; the gating tab simply disables itself,
+since a summary cannot be re-gated. Both standalone files remain unchanged for
+when you only need one half.
+
+See `WORKBENCH_GUIDE.md`.
+
 ### Comparing replicate wells: the Condition Explorer
 
 `condition_explorer.html` is a second browser tool for the step after gating:
@@ -795,12 +815,45 @@ pseudo-replication and produces meaningless p-values.
 - **Tests** — Welch's t / Welch's ANOVA by default (no equal-variance
   assumption), with Student's and rank-based alternatives, Hedges' *g* with CI,
   and Holm or Benjamini–Hochberg correction across all pairs.
+- **Dose–response / IC50** for multi-compound plates, with the compound and
+  concentration roles labelled explicitly and a concentration-unit selector
+  (guessed from the column name, applied to the axis, tables and export): a
+  four-parameter logistic fit per compound with 95% CI, Hill slope, R², log-axis
+  curve plot, optional
+  normalisation to vehicle or % inhibition, constrained fits, and a selectivity
+  index against a second readout. IC50s that are extrapolated beyond the tested
+  doses, poorly fitted, or resting on an implausible Hill slope are flagged
+  rather than quietly reported.
+- **Assay quality** — Z′-factor, SSMD, signal window, signal/background and CV
+  per control, from a designated positive and negative control condition.
+- **Curve comparison** — an extra sum-of-squares F test asking whether two
+  compounds share an IC50, which is the correct test; overlapping confidence
+  intervals are not one.
+- **IC50 per cell population within a well** — split cells on any positivity
+  call, `dead`, or a population class (needs a per-nucleus file), fit a curve to
+  each, and test whether the populations respond at different doses. A well
+  average can hide a tenfold difference between the populations inside it.
+- **Two-way ANOVA** for crossed designs (genotype × dose, siRNA × treatment),
+  set up either from metadata columns or entirely by hand — add, rename and
+  delete levels on each factor, then paint wells:
+  both main effects plus the interaction, with an interaction plot, a cell-means
+  grid, and Type II or Type III sums of squares computed by nested model
+  comparison so unbalanced plates are handled correctly, plus post-hoc
+  comparisons using the pooled error term — simple effects when the interaction
+  is significant, marginal means when it isn't. Empty cells are
+  detected and the interaction dropped rather than silently mis-estimated.
 - **Warnings** when n < 3, when n = 3 throughout, when wells are unassigned, and
   when many comparisons run uncorrected.
 
 Every test is validated against `scipy.stats` — Welch, Student, Mann–Whitney,
 ANOVA, Kruskal–Wallis, Hedges' *g*, CIs, Holm and BH — agreeing to within
-3.6 × 10⁻¹⁴.
+3.6 × 10⁻¹⁴. The two-way ANOVA is validated separately against both the textbook
+formulas and an independent numpy least-squares reference, across balanced and
+unbalanced designs, to within 2 × 10⁻¹⁴. The curve fitter is validated against
+`scipy.optimize.curve_fit` on six dose-response shapes — IC50, Hill, R² and the
+confidence bounds all agreeing to within 1.6 × 10⁻⁸. The curve-comparison F test
+and the Z′/SSMD metrics are validated the same way against scipy and numpy
+references.
 
 See `CONDITION_EXPLORER_GUIDE.md`.
 
@@ -1791,3 +1844,42 @@ files afterwards — they have identical columns, so in pandas:
 | parquet | A compressed table format; smaller and much faster than CSV |
 | CLI flag | The `--something` options you type after the script name |
 
+
+---
+
+## Setting up the repository
+
+If you're the one publishing this, GitHub's **topics** are how people find a
+tool like this — they're indexed by GitHub search and by the topic pages, in a
+way that README text is not.
+
+**In the browser:** open the repository, click the **⚙ gear** next to *About* on
+the right-hand side, and fill in the *Description*, *Website* and *Topics*
+fields. Topics are lowercase, hyphen-separated, and you can have up to 20.
+
+**From the command line**, with the [GitHub CLI](https://cli.github.com):
+
+```bash
+gh repo edit --add-topic omero,high-content-screening,microscopy,image-analysis
+gh repo edit --add-topic image-cytometry,cell-segmentation,stardist,cellpose
+gh repo edit --add-topic flow-cytometry,gating,high-throughput-screening
+gh repo edit --add-topic bioimage-analysis,python,imagexpress
+gh repo edit --description "Flow-cytometry-style analysis of high-content microscopy: nuclear segmentation, multi-marker gating and foci counting, straight from OMERO"
+```
+
+(`--add-topic` takes a comma-separated list and can be repeated; splitting it
+across a few lines just keeps it readable.)
+
+Two things worth doing at the same time:
+
+- **Point the *Website* field** at the raw `gating_explorer.html` if you host it
+  anywhere, or at the docs. If you enable GitHub Pages for the repository, the
+  two explorers work as-is from a Pages URL — they're plain static HTML with no
+  build step and no server, so students could use them without cloning anything.
+- **Add a `CITATION.cff`** if this ends up supporting a paper. GitHub renders a
+  "Cite this repository" button from it automatically.
+
+A note on licensing: the pipeline depends on StarDist and Cellpose, which carry
+their own licences (BSD-3-Clause with a non-commercial clause, and BSD-3-Clause
+respectively). Worth checking those before choosing yours, particularly if
+anyone downstream might want commercial use.

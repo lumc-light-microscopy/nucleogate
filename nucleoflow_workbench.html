@@ -3,12 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Condition Explorer — replicate wells, grouped and tested</title>
+<title>nucleoflow workbench — gate, then compare</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
+  /* Palette derived from fluorophore emission, on microscope-room dark */
+  --void:#0B1017; --panel:#141C28; --panel-2:#1B2534; --line:#2C3D52;
+  --ink:#F1F5F9; --dim:#A7B3C3; --faint:#7A8EA9;
+  --c405:#5B8FF9; --c488:#3FD16B; --c561:#FFA23D; --c640:#FF5470; --c680:#C77DFF;
+  --gate:#FFD84D;              /* deliberately not a fluorophore colour */
+  --off:#33455C;
+  --r:3px;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Space Grotesk',ui-sans-serif,system-ui,-apple-system,sans-serif;
+
+
   --void:#0B1017; --panel:#141C28; --panel-2:#1B2534; --line:#2C3D52;
   --ink:#F1F5F9; --dim:#A7B3C3; --faint:#7A8EA9; --off:#33455C;
   /* Okabe–Ito: distinguishable for the ~8% of men with colour-vision deficiency.
@@ -26,264 +37,660 @@ html,body{height:100%}
 body{background:var(--void); color:var(--ink); font-family:var(--sans);
   font-size:13px; line-height:1.45; overflow:hidden; -webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--g0); outline-offset:2px}
+:focus-visible{outline:2px solid var(--c488); outline-offset:2px}
 
-#app{display:none; height:100vh; grid-template-rows:auto 1fr}
-#app.ready{display:grid}
-header{display:flex; align-items:center; gap:16px; padding:9px 16px;
-  border-bottom:1px solid var(--line); background:var(--panel)}
-.brand{font-weight:700; letter-spacing:-.02em; font-size:14px; white-space:nowrap}
-.brand span{color:var(--g0)}
-.stat{font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap}
-.stat b{color:var(--ink); font-weight:500; font-variant-numeric:tabular-nums}
-header .sp{flex:1}
-.btn{background:var(--panel-2); border:1px solid var(--line); border-radius:var(--r);
-  padding:5px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap;
-  transition:border-color .12s, background .12s}
-.btn:hover{border-color:var(--faint); background:#26344A}
-.btn.primary{border-color:var(--g0); color:var(--g0)}
-.btn.primary:hover{background:rgba(86,180,233,.12)}
-
-main{display:grid; grid-template-columns:392px 1fr; min-height:0}
-aside{border-right:1px solid var(--line); background:var(--panel);
-  overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:18px}
-.work{overflow-y:auto; padding:16px 18px 44px; display:flex; flex-direction:column; gap:18px}
-.sec-h{display:flex; align-items:baseline; gap:8px; margin-bottom:8px;
-  font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim)}
-.sec-h .n{font-family:var(--mono); color:var(--faint); font-size:10px;
-  text-transform:none; letter-spacing:0}
-.sec-h .act{margin-left:auto; text-transform:none; letter-spacing:0; font-size:10.5px;
-  color:var(--faint); cursor:pointer; border:0; background:none; padding:0}
-.sec-h .act:hover{color:var(--g0)}
-.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:14px}
-
-/* ---- plate: paint wells with the active group ---- */
-#plateWrap{overflow-x:auto; padding-bottom:4px}
-#plate{border-collapse:separate; border-spacing:3px; font-family:var(--mono); font-size:9.5px}
-#plate th{color:var(--faint); font-weight:400; font-size:9.5px; padding:0 2px}
-.well{width:var(--wsz,22px); height:var(--wsz,22px); border-radius:3px; cursor:pointer;
-  background:var(--off); border:1px solid transparent; transition:transform .08s;
-  position:relative; display:flex; align-items:center; justify-content:center;
-  font-size:8px; color:#0B1017; font-weight:700}
-.well:hover{transform:scale(1.25); z-index:5; border-color:var(--ink)}
-.well.empty{background:transparent; cursor:default}
-.well.empty:hover{transform:none; border-color:transparent}
-.well.unassigned{background:var(--off)}
-
-/* ---- groups ---- */
-.grp{display:flex; align-items:center; gap:8px; padding:6px 7px; border-radius:var(--r);
-  border:1px solid transparent; cursor:pointer; margin-bottom:3px}
-.grp:hover{background:var(--panel-2)}
-.grp.active{border-color:var(--g0); background:var(--panel-2)}
-.grp .sw{width:13px; height:13px; border-radius:3px; flex:none}
-.grp .nm{flex:1; min-width:0; font-size:12px; background:none; border:0; padding:2px 3px;
-  border-radius:2px}
-.grp .nm:hover{background:var(--panel)}
-.grp .ct{font-family:var(--mono); font-size:10.5px; color:var(--dim)}
-.grp .ct.low{color:var(--warn)}
-.grp .rm{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;
-  padding:0 3px; line-height:1}
-.grp .rm:hover{color:var(--bad)}
-.hint{color:var(--faint); font-size:11px; font-family:var(--mono); line-height:1.5}
-.roles{border:1px solid var(--line); border-left:3px solid var(--g0);
-  border-radius:var(--r); padding:7px 9px; margin-bottom:10px; font-size:11px;
-  line-height:1.6; color:var(--dim)}
-.roles b{color:var(--ink); font-weight:500}
-.roles .bad{color:var(--bad)}
-.roles code{font-family:var(--mono); font-size:10.5px; color:var(--g1)}
-.fhdr{display:flex; align-items:center; gap:7px; margin-bottom:5px}
-.fhdr .fkey{font-family:var(--mono); font-size:9.5px; color:var(--faint);
+/* ---- workbench shell ---- */
+#wb{display:grid; grid-template-rows:auto 1fr; height:100vh}
+#tabs{display:flex; align-items:center; gap:2px; padding:0 14px;
+  background:var(--void); border-bottom:1px solid var(--line)}
+#tabs .brand{font-weight:700; font-size:14px; letter-spacing:-.02em;
+  margin-right:16px; white-space:nowrap; padding:9px 0}
+#tabs .brand span{color:var(--c488)}
+.tab{background:none; border:0; border-bottom:2px solid transparent; cursor:pointer;
+  padding:11px 15px 9px; font-size:12.5px; color:var(--dim); white-space:nowrap;
+  display:flex; align-items:center; gap:7px}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink); border-bottom-color:var(--c488)}
+.tab .num{font-family:var(--mono); font-size:9.5px; color:var(--faint);
   border:1px solid var(--line); border-radius:3px; padding:0 4px}
-.fhdr .fname{flex:1; min-width:0; background:none; border:0; padding:2px 4px;
-  border-radius:2px; font-size:12px; font-weight:500}
-.fhdr .fname:hover,.fhdr .fname:focus{background:var(--panel-2)}
-.fhdr .act{margin-left:0; border:1px solid var(--line); background:var(--panel-2);
-  border-radius:var(--r); padding:2px 8px; font-size:10.5px; color:var(--faint);
-  cursor:pointer; white-space:nowrap}
-.fhdr .act:hover{color:var(--g0); border-color:var(--g0)}
-.levels{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px}
-.lv{display:flex; align-items:center; gap:6px; padding:3px 6px; border-radius:var(--r);
-  border:1px solid transparent; cursor:pointer; margin-top:3px}
-.lv:hover{background:var(--panel-2)}
-.lv.active{border-color:var(--g0); background:var(--panel-2)}
-.lv .sw{width:11px; height:11px; border-radius:3px; flex:none}
-.lv .nm{flex:1; min-width:0; font-size:11.5px; background:none; border:0;
-  padding:1px 3px; border-radius:2px; font-family:var(--mono)}
-.lv .nm:hover{background:var(--panel)}
-.lv .ct{font-family:var(--mono); font-size:10px; color:var(--dim)}
-.lv .read{font-family:var(--mono); font-size:9.5px; color:var(--g2);
-  white-space:nowrap; flex:none}
-.lv .read.bad{color:var(--bad)}
-.lv .rm{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;
-  padding:0 2px; line-height:1}
-.lv .rm:hover{color:var(--bad)}
-.lev{padding:3px 8px; border-radius:10px; border:1px solid var(--line); cursor:pointer;
-  font-size:11px; font-family:var(--mono); background:var(--panel-2); user-select:none}
-.lev:hover{border-color:var(--faint)}
-.lev.on{color:#0B1017; font-weight:700}
-.lev .ct{opacity:.65; font-size:9.5px; margin-left:3px}
-.row{display:flex; align-items:center; gap:8px; margin-bottom:6px}
-.row label{font-size:11px; color:var(--dim)}
-select,input[type=text]{background:var(--panel-2); border:1px solid var(--line);
-  border-radius:var(--r); padding:4px 7px; font-size:11px; font-family:var(--mono); width:100%}
+.tab.on .num{color:var(--c488); border-color:var(--c488)}
+.tab:disabled{opacity:.4; cursor:default}
+#tabs .sp{flex:1}
+#wbFile{font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap}
+#wbFile b{color:var(--ink); font-weight:500}
+.wbtn{background:var(--panel-2); border:1px solid var(--line); border-radius:3px;
+  padding:4px 10px; font-size:11.5px; cursor:pointer; margin-left:8px}
+.wbtn:hover{border-color:var(--faint)}
+#panes{position:relative; min-height:0}
+.pane{position:absolute; inset:0; overflow:hidden; display:none}
+.pane.on{display:block}
 
-/* ---- plots ---- */
-.plot canvas{width:100%; display:block; border-radius:2px}
-.plot .cap{font-family:var(--mono); font-size:10px; color:var(--faint);
-  margin-top:5px; text-align:center}
-.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px}
-
-/* ---- tables ---- */
-.tbl{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:10.5px}
-.tbl th{text-align:right; color:var(--dim); font-weight:500; padding:5px 7px;
-  border-bottom:1px solid var(--line); font-size:9.5px; letter-spacing:.04em;
-  text-transform:uppercase; white-space:nowrap; position:sticky; top:0; background:var(--panel)}
-.tbl th:first-child,.tbl td:first-child{text-align:left}
-/* units must not be uppercased: CSS turns µ into Greek capital Mu, so "µM"
-   renders as "MM" and the reader has no idea what scale they are looking at */
-.tbl th .u{text-transform:none}
-.tbl td{padding:4px 7px; border-bottom:1px solid #22303F; text-align:right;
-  font-variant-numeric:tabular-nums; white-space:nowrap}
-.tbl tr:hover td{background:var(--panel-2)}
-.tblScroll{max-height:340px; overflow:auto}
-.sig{font-weight:700}
-.sig.y{color:var(--ok)} .sig.n{color:var(--faint)}
-.pill{display:inline-block; padding:0 5px; border-radius:8px; font-size:9.5px;
-  border:1px solid var(--line); color:var(--dim)}
-
-/* ---- warnings ---- */
-.warn{border-left:3px solid var(--warn); background:rgba(255,162,61,.07);
-  padding:9px 12px; border-radius:var(--r); font-size:11.5px; line-height:1.55;
-  color:var(--ink); margin-bottom:12px}
-.warn b{color:var(--warn)}
-.warn.bad{border-left-color:var(--bad); background:rgba(255,84,112,.07)}
-.warn.bad b{color:var(--bad)}
-
-/* ---- drop ---- */
-#drop{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-  flex-direction:column; gap:20px; background:var(--void); z-index:50; padding:24px}
-#drop.hide{display:none}
-.dz{border:1px dashed var(--line); border-radius:6px; padding:42px 52px; text-align:center; max-width:640px}
-.dz.hot{border-color:var(--g0); background:rgba(86,180,233,.05)}
-.dz h1{font-size:23px; font-weight:700; letter-spacing:-.025em; margin-bottom:6px}
-.dz h1 em{font-style:normal; color:var(--g0)}
-.dz p{color:var(--dim); font-size:12.5px; margin-bottom:18px; line-height:1.6}
-.dz code{font-family:var(--mono); font-size:11.5px; color:var(--g1);
+/* ---- shared loader ---- */
+#wbDrop{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:22px; background:var(--void); z-index:80; padding:24px}
+#wbDrop.hide{display:none}
+.wbdz{border:1px dashed var(--line); border-radius:6px; padding:44px 54px;
+  text-align:center; max-width:660px; transition:border-color .15s, background .15s}
+.wbdz.hot{border-color:var(--c488); background:rgba(63,209,107,.05)}
+.wbdz h1{font-size:24px; font-weight:700; letter-spacing:-.025em; margin-bottom:8px}
+.wbdz h1 em{font-style:normal; color:var(--c488)}
+.wbdz p{color:var(--dim); font-size:12.5px; margin-bottom:20px; line-height:1.65}
+.wbdz code{font-family:var(--mono); font-size:11.5px; color:var(--c561);
   background:var(--panel); padding:1px 5px; border-radius:2px}
-.swatches{display:flex; gap:4px; justify-content:center; margin-bottom:24px}
-.swatches i{width:30px; height:4px; border-radius:2px; display:block}
-#err{color:var(--bad); font-family:var(--mono); font-size:11.5px; max-width:640px;
-  text-align:center; min-height:17px}
-#busy{position:fixed;inset:0;background:rgba(11,16,23,.82);display:none;align-items:center;
-  justify-content:center;z-index:60;font-family:var(--mono);font-size:12px;color:var(--g0)}
-#busy.on{display:flex}
+.steps{display:flex; gap:0; justify-content:center; margin-bottom:26px;
+  font-family:var(--mono); font-size:10.5px; color:var(--faint)}
+.steps i{font-style:normal; padding:0 12px; position:relative}
+.steps i+i::before{content:"→"; position:absolute; left:-4px; color:var(--line)}
+#wbErr{color:var(--c640); font-family:var(--mono); font-size:11.5px;
+  max-width:660px; text-align:center; min-height:17px}
+#wbBusy{position:fixed; inset:0; background:rgba(11,16,23,.85); display:none;
+  align-items:center; justify-content:center; z-index:90;
+  font-family:var(--mono); font-size:12px; color:var(--c488)}
+#wbBusy.on{display:flex}
+#wbNote{position:fixed; left:50%; bottom:20px; transform:translate(-50%,14px);
+  background:var(--panel-2); border:1px solid var(--c561); border-left-width:3px;
+  border-radius:3px; padding:10px 14px; max-width:620px; z-index:85; opacity:0;
+  pointer-events:none; transition:opacity .18s, transform .18s; font-size:12px; line-height:1.5}
+#wbNote.show{opacity:1; transform:translate(-50%,0)}
+#wbNote b{color:var(--c561)}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-track{background:var(--void)}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-@media (max-width:900px){main{grid-template-columns:1fr}}
+
+/* ================= gating pane ================= */
+#pane-gate *{box-sizing:border-box;margin:0;padding:0}
+#pane-gate html, #pane-gate body{height:100%}
+#pane-gate body{
+  background:var(--void); color:var(--ink); font-family:var(--sans);
+  font-size:13px; line-height:1.45; overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+#pane-gate button, #pane-gate input, #pane-gate select{font:inherit;color:inherit}
+#pane-gate :focus-visible{outline:2px solid var(--gate); outline-offset:2px}
+#pane-gate /* ---------- shell ---------- */
+#G-app{display:none; height:100vh; grid-template-rows:auto 1fr}
+#pane-gate #G-app.ready{display:grid}
+#pane-gate header{
+  display:flex; align-items:center; gap:18px; padding:9px 16px;
+  border-bottom:1px solid var(--line); background:var(--panel);
+}
+#pane-gate .brand{font-weight:700; letter-spacing:-.02em; font-size:14px; white-space:nowrap}
+#pane-gate .brand span{color:var(--c488)}
+#pane-gate .stat{font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap}
+#pane-gate .stat b{color:var(--ink); font-weight:500; font-variant-numeric:tabular-nums}
+#pane-gate header .sp{flex:1}
+#pane-gate .btn{
+  background:var(--panel-2); border:1px solid var(--line); border-radius:var(--r);
+  padding:5px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap;
+  transition:border-color .12s, background .12s;
+}
+#pane-gate .btn:hover{border-color:var(--faint); background:#26344A}
+#pane-gate .btn.primary{border-color:var(--c488); color:var(--c488)}
+#pane-gate .btn.primary:hover{background:rgba(63,209,107,.1)}
+#pane-gate main{display:grid; grid-template-columns:372px 1fr; min-height:0}
+#pane-gate aside{
+  border-right:1px solid var(--line); background:var(--panel);
+  overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:18px;
+}
+#pane-gate .work{overflow-y:auto; padding:16px 18px 40px; display:flex; flex-direction:column; gap:18px}
+#pane-gate /* ---------- section furniture ---------- */
+.sec-h{
+  display:flex; align-items:baseline; gap:8px; margin-bottom:8px;
+  font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
+}
+#pane-gate .sec-h .n{font-family:var(--mono); color:var(--faint); font-size:10px}
+#pane-gate .sec-h .act{margin-left:auto; text-transform:none; letter-spacing:0; font-size:10.5px;
+  color:var(--faint); cursor:pointer; border:0; background:none; padding:0}
+#pane-gate .sec-h .act:hover{color:var(--c488)}
+#pane-gate .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:14px}
+#pane-gate /* ---------- plate map (signature) ---------- */
+#G-plateWrap{overflow-x:auto; padding-bottom:4px}
+#pane-gate #G-plate{border-collapse:separate; border-spacing:3px; font-family:var(--mono); font-size:9.5px}
+#pane-gate #G-plate th{color:var(--faint); font-weight:400; font-size:9.5px; padding:0 2px}
+#pane-gate #G-plate td{padding:0}
+#pane-gate .well{
+  width:var(--wsz,23px); height:var(--wsz,23px); border-radius:3px; cursor:pointer; position:relative;
+  background:var(--off); border:1px solid transparent; transition:transform .08s;
+}
+#pane-gate .well:hover{transform:scale(1.28); z-index:5; border-color:var(--ink)}
+#pane-gate .well.excluded{background:transparent !important; border:1px dashed var(--faint)}
+#pane-gate .well.empty{background:transparent; border:1px solid transparent; cursor:default}
+#pane-gate .well.empty:hover{transform:none; border-color:transparent}
+#pane-gate .legend{display:flex; align-items:center; gap:7px; margin-top:10px; font-family:var(--mono); font-size:10px; color:var(--faint)}
+#pane-gate .ramp{height:8px; flex:1; border-radius:3px}
+#pane-gate /* ---------- controls ---------- */
+.row{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+#pane-gate .row label{font-size:11px; color:var(--dim); flex:1}
+#pane-gate select, #pane-gate input[type=text], #pane-gate input[type=number]{
+  background:var(--panel-2); border:1px solid var(--line); border-radius:var(--r);
+  padding:4px 7px; font-size:11px; font-family:var(--mono); width:100%;
+}
+#pane-gate .chan{
+  display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--r);
+  cursor:pointer; border:1px solid transparent; user-select:none;
+}
+#pane-gate .chan:hover{background:var(--panel-2)}
+#pane-gate .chan.off{opacity:.4}
+#pane-gate .dot{width:9px; height:9px; border-radius:50%; flex:none}
+#pane-gate .chan .nm{font-weight:500; font-size:12px}
+#pane-gate .chan .pc{margin-left:auto; font-family:var(--mono); font-size:10.5px; color:var(--dim); font-variant-numeric:tabular-nums}
+#pane-gate .chan input{display:none}
+#pane-gate /* ---------- gates ---------- */
+.gate{margin-bottom:12px}
+#pane-gate .gate:last-child{margin-bottom:0}
+#pane-gate .gate-h{display:flex; align-items:center; gap:8px; margin-bottom:3px}
+#pane-gate .gate-h .nm{font-weight:500; font-size:12px}
+#pane-gate .gate-h .val{
+  margin-left:auto; font-family:var(--mono); font-size:10.5px; color:var(--gate);
+  background:transparent; border:1px solid var(--line); border-radius:2px;
+  padding:1px 5px; width:88px; text-align:right;
+}
+#pane-gate .gate-h .pc{font-family:var(--mono); font-size:10.5px; color:var(--dim); width:52px; text-align:right}
+#pane-gate .gate-h .rst{border:0;background:none;color:var(--faint);cursor:pointer;font-size:10px;padding:0 2px}
+#pane-gate .gate-h .rst:hover{color:var(--gate)}
+#pane-gate .histWrap{position:relative; height:68px; cursor:ew-resize; touch-action:none}
+#pane-gate .histWrap canvas{position:absolute; inset:0; width:100%; height:100%}
+#pane-gate /* ---------- QC range gates ---------- */
+.qcGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(196px,1fr)); gap:12px 14px}
+#pane-gate .qc{min-width:0}
+#pane-gate .qc-h{display:flex; align-items:center; gap:6px; margin-bottom:2px}
+#pane-gate .qc-h .nm{font-size:11.5px; font-weight:500}
+#pane-gate .qc-h .kind{font-family:var(--mono); font-size:9px; color:var(--faint)}
+#pane-gate .qc-h .sw{margin-left:auto; width:26px; height:14px; border-radius:8px; background:var(--off);
+  border:1px solid var(--line); position:relative; cursor:pointer; flex:none}
+#pane-gate .qc-h .sw::after{content:""; position:absolute; top:1px; left:1px; width:10px; height:10px;
+  border-radius:50%; background:var(--dim); transition:transform .12s, background .12s}
+#pane-gate .qc.on .sw{background:rgba(91,143,249,.25); border-color:var(--c405)}
+#pane-gate .qc.on .sw::after{transform:translateX(12px); background:var(--c405)}
+#pane-gate .qc .rangeWrap{position:relative; height:52px; cursor:ew-resize; touch-action:none}
+#pane-gate .qc .rangeWrap canvas{position:absolute; inset:0; width:100%; height:100%}
+#pane-gate .qc.off .rangeWrap{opacity:.45}
+#pane-gate .qc .lims{display:flex; gap:5px; margin-top:3px}
+#pane-gate .qc .lims input{font-family:var(--mono); font-size:10px; padding:2px 4px; text-align:center;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:2px; width:100%}
+#pane-gate .qc .lims input:disabled{opacity:.4}
+#pane-gate .qcNote{font-family:var(--mono); font-size:10.5px; color:var(--dim)}
+#pane-gate .qcNote b{color:var(--c405); font-weight:500}
+#pane-gate /* the scatter is a companion to the windows, #pane-gate not a feature plot: cap it so
+   the two halves of the card finish at roughly the same height */
+.morphPane{max-width:326px}
+#pane-gate .morphPick{display:flex; gap:6px; align-items:center; margin-bottom:6px}
+#pane-gate .morphPick select{width:auto; flex:1; font-size:10.5px; padding:3px 5px}
+#pane-gate .morphPick span{font-family:var(--mono); font-size:10px; color:var(--faint)}
+#pane-gate /* ---------- plots ---------- */
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px}
+#pane-gate /* gates and the flow-style plots sit side by side: you drag on the left and
+   watch the quadrants move on the right without looking away */
+.split{display:grid; grid-template-columns:minmax(320px,1fr) minmax(300px,1.05fr); gap:16px; align-items:start}
+#pane-gate .split .card{min-width:0}
+#pane-gate /* small multiples stay small: one pair shouldn't balloon to fill the card */
+#G-biGrid{grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:10px; justify-content:start}
+#pane-gate #G-biGrid .plot{max-width:238px; width:100%}
+#pane-gate #G-biGrid .cap{font-size:9.5px; margin-top:3px}
+@media (max-width:1180px){#pane-gate .split{grid-template-columns:1fr}}
+#pane-gate .plot{position:relative}
+#pane-gate .plot canvas{width:100%; display:block; border-radius:2px}
+#pane-gate .plot .cap{font-family:var(--mono); font-size:10px; color:var(--dim); margin-top:5px; text-align:center}
+#pane-gate /* ---------- table ---------- */
+.tbl{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:10.5px}
+#pane-gate .tbl th{
+  text-align:right; color:var(--dim); font-weight:500; padding:5px 7px;
+  border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel);
+  font-size:9.5px; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap;
+}
+#pane-gate .tbl th:first-child, #pane-gate .tbl td:first-child{text-align:left}
+#pane-gate .tbl td{padding:4px 7px; border-bottom:1px solid #22303F; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+#pane-gate .tbl tr:hover td{background:var(--panel-2)}
+#pane-gate .tblScroll{max-height:290px; overflow:auto}
+#pane-gate /* ---------- drop zone ---------- */
+#G-drop{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:22px; background:var(--void); z-index:50; padding:24px;
+}
+#pane-gate #G-drop.hide{display:none}
+#pane-gate .dz{
+  border:1px dashed var(--line); border-radius:6px; padding:44px 54px; text-align:center;
+  max-width:620px; transition:border-color .15s, background .15s;
+}
+#pane-gate .dz.hot{border-color:var(--c488); background:rgba(63,209,107,.05)}
+#pane-gate .dz h1{font-size:23px; font-weight:700; letter-spacing:-.025em; margin-bottom:6px}
+#pane-gate .dz h1 em{font-style:normal; color:var(--c488)}
+#pane-gate .dz p{color:var(--dim); font-size:12.5px; margin-bottom:20px; line-height:1.6}
+#pane-gate .dz code{font-family:var(--mono); font-size:11.5px; color:var(--c561); background:var(--panel); padding:1px 5px; border-radius:2px}
+#pane-gate .spectrum{display:flex; gap:3px; justify-content:center; margin-bottom:26px}
+#pane-gate .spectrum i{width:34px; height:3px; border-radius:2px; display:block}
+#pane-gate #G-err{color:var(--c640); font-family:var(--mono); font-size:11.5px; max-width:620px; text-align:center; min-height:17px}
+#pane-gate .hint{color:var(--faint); font-size:11px; font-family:var(--mono)}
+#pane-gate /* transient notice */
+#G-toast{position:fixed; left:50%; bottom:22px; transform:translate(-50%,14px);
+  background:var(--panel-2); border:1px solid var(--c561); border-left-width:3px;
+  border-radius:var(--r); padding:10px 14px; max-width:620px; z-index:70;
+  opacity:0; pointer-events:none; transition:opacity .18s, transform .18s;
+  font-size:12px; line-height:1.5; box-shadow:0 8px 26px rgba(0,0,0,.45)}
+#pane-gate #G-toast.show{opacity:1; transform:translate(-50%,0)}
+#pane-gate #G-toast b{color:var(--c561); font-weight:500}
+#pane-gate #G-toast .k{font-family:var(--mono); font-size:11px; color:var(--ink)}
+#pane-gate /* busy */
+#G-busy{position:fixed;inset:0;background:rgba(11,16,23,.82);display:none;align-items:center;
+  justify-content:center;z-index:60;font-family:var(--mono);font-size:12px;color:var(--c488)}
+#pane-gate #G-busy.on{display:flex}
+#pane-gate ::-webkit-scrollbar{width:9px;height:9px}
+#pane-gate ::-webkit-scrollbar-track{background:var(--void)}
+#pane-gate ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+#pane-gate ::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+@media (prefers-reduced-motion:reduce){#pane-gate *{transition:none!important}}
+@media (max-width:820px){#pane-gate main{grid-template-columns:1fr}
+#pane-gate aside{border-right:0;border-bottom:1px solid var(--line)}}
+
+/* ================= condition pane ================= */
+#pane-cond *{box-sizing:border-box;margin:0;padding:0}
+#pane-cond html, #pane-cond body{height:100%}
+#pane-cond body{background:var(--void); color:var(--ink); font-family:var(--sans);
+  font-size:13px; line-height:1.45; overflow:hidden; -webkit-font-smoothing:antialiased}
+#pane-cond button, #pane-cond input, #pane-cond select{font:inherit;color:inherit}
+#pane-cond :focus-visible{outline:2px solid var(--g0); outline-offset:2px}
+#pane-cond #C-app{display:none; height:100vh; grid-template-rows:auto 1fr}
+#pane-cond #C-app.ready{display:grid}
+#pane-cond header{display:flex; align-items:center; gap:16px; padding:9px 16px;
+  border-bottom:1px solid var(--line); background:var(--panel)}
+#pane-cond .brand{font-weight:700; letter-spacing:-.02em; font-size:14px; white-space:nowrap}
+#pane-cond .brand span{color:var(--g0)}
+#pane-cond .stat{font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap}
+#pane-cond .stat b{color:var(--ink); font-weight:500; font-variant-numeric:tabular-nums}
+#pane-cond header .sp{flex:1}
+#pane-cond .btn{background:var(--panel-2); border:1px solid var(--line); border-radius:var(--r);
+  padding:5px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap;
+  transition:border-color .12s, background .12s}
+#pane-cond .btn:hover{border-color:var(--faint); background:#26344A}
+#pane-cond .btn.primary{border-color:var(--g0); color:var(--g0)}
+#pane-cond .btn.primary:hover{background:rgba(86,180,233,.12)}
+#pane-cond main{display:grid; grid-template-columns:392px 1fr; min-height:0}
+#pane-cond aside{border-right:1px solid var(--line); background:var(--panel);
+  overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:18px}
+#pane-cond .work{overflow-y:auto; padding:16px 18px 44px; display:flex; flex-direction:column; gap:18px}
+#pane-cond .sec-h{display:flex; align-items:baseline; gap:8px; margin-bottom:8px;
+  font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim)}
+#pane-cond .sec-h .n{font-family:var(--mono); color:var(--faint); font-size:10px;
+  text-transform:none; letter-spacing:0}
+#pane-cond .sec-h .act{margin-left:auto; text-transform:none; letter-spacing:0; font-size:10.5px;
+  color:var(--faint); cursor:pointer; border:0; background:none; padding:0}
+#pane-cond .sec-h .act:hover{color:var(--g0)}
+#pane-cond .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:14px}
+#pane-cond /* ---- plate: paint wells with the active group ---- */
+#C-plateWrap{overflow-x:auto; padding-bottom:4px}
+#pane-cond #C-plate{border-collapse:separate; border-spacing:3px; font-family:var(--mono); font-size:9.5px}
+#pane-cond #C-plate th{color:var(--faint); font-weight:400; font-size:9.5px; padding:0 2px}
+#pane-cond .well{width:var(--wsz,22px); height:var(--wsz,22px); border-radius:3px; cursor:pointer;
+  background:var(--off); border:1px solid transparent; transition:transform .08s;
+  position:relative; display:flex; align-items:center; justify-content:center;
+  font-size:8px; color:#0B1017; font-weight:700}
+#pane-cond .well:hover{transform:scale(1.25); z-index:5; border-color:var(--ink)}
+#pane-cond .well.empty{background:transparent; cursor:default}
+#pane-cond .well.empty:hover{transform:none; border-color:transparent}
+#pane-cond .well.unassigned{background:var(--off)}
+#pane-cond /* ---- groups ---- */
+.grp{display:flex; align-items:center; gap:8px; padding:6px 7px; border-radius:var(--r);
+  border:1px solid transparent; cursor:pointer; margin-bottom:3px}
+#pane-cond .grp:hover{background:var(--panel-2)}
+#pane-cond .grp.active{border-color:var(--g0); background:var(--panel-2)}
+#pane-cond .grp .sw{width:13px; height:13px; border-radius:3px; flex:none}
+#pane-cond .grp .nm{flex:1; min-width:0; font-size:12px; background:none; border:0; padding:2px 3px;
+  border-radius:2px}
+#pane-cond .grp .nm:hover{background:var(--panel)}
+#pane-cond .grp .ct{font-family:var(--mono); font-size:10.5px; color:var(--dim)}
+#pane-cond .grp .ct.low{color:var(--warn)}
+#pane-cond .grp .rm{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;
+  padding:0 3px; line-height:1}
+#pane-cond .grp .rm:hover{color:var(--bad)}
+#pane-cond .hint{color:var(--faint); font-size:11px; font-family:var(--mono); line-height:1.5}
+#pane-cond .roles{border:1px solid var(--line); border-left:3px solid var(--g0);
+  border-radius:var(--r); padding:7px 9px; margin-bottom:10px; font-size:11px;
+  line-height:1.6; color:var(--dim)}
+#pane-cond .roles b{color:var(--ink); font-weight:500}
+#pane-cond .roles .bad{color:var(--bad)}
+#pane-cond .roles code{font-family:var(--mono); font-size:10.5px; color:var(--g1)}
+#pane-cond .fhdr{display:flex; align-items:center; gap:7px; margin-bottom:5px}
+#pane-cond .fhdr .fkey{font-family:var(--mono); font-size:9.5px; color:var(--faint);
+  border:1px solid var(--line); border-radius:3px; padding:0 4px}
+#pane-cond .fhdr .fname{flex:1; min-width:0; background:none; border:0; padding:2px 4px;
+  border-radius:2px; font-size:12px; font-weight:500}
+#pane-cond .fhdr .fname:hover, #pane-cond .fhdr .fname:focus{background:var(--panel-2)}
+#pane-cond .fhdr .act{margin-left:0; border:1px solid var(--line); background:var(--panel-2);
+  border-radius:var(--r); padding:2px 8px; font-size:10.5px; color:var(--faint);
+  cursor:pointer; white-space:nowrap}
+#pane-cond .fhdr .act:hover{color:var(--g0); border-color:var(--g0)}
+#pane-cond .levels{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px}
+#pane-cond .lv{display:flex; align-items:center; gap:6px; padding:3px 6px; border-radius:var(--r);
+  border:1px solid transparent; cursor:pointer; margin-top:3px}
+#pane-cond .lv:hover{background:var(--panel-2)}
+#pane-cond .lv.active{border-color:var(--g0); background:var(--panel-2)}
+#pane-cond .lv .sw{width:11px; height:11px; border-radius:3px; flex:none}
+#pane-cond .lv .nm{flex:1; min-width:0; font-size:11.5px; background:none; border:0;
+  padding:1px 3px; border-radius:2px; font-family:var(--mono)}
+#pane-cond .lv .nm:hover{background:var(--panel)}
+#pane-cond .lv .ct{font-family:var(--mono); font-size:10px; color:var(--dim)}
+#pane-cond .lv .read{font-family:var(--mono); font-size:9.5px; color:var(--g2);
+  white-space:nowrap; flex:none}
+#pane-cond .lv .read.bad{color:var(--bad)}
+#pane-cond .lv .rm{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;
+  padding:0 2px; line-height:1}
+#pane-cond .lv .rm:hover{color:var(--bad)}
+#pane-cond .lev{padding:3px 8px; border-radius:10px; border:1px solid var(--line); cursor:pointer;
+  font-size:11px; font-family:var(--mono); background:var(--panel-2); user-select:none}
+#pane-cond .lev:hover{border-color:var(--faint)}
+#pane-cond .lev.on{color:#0B1017; font-weight:700}
+#pane-cond .lev .ct{opacity:.65; font-size:9.5px; margin-left:3px}
+#pane-cond .row{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+#pane-cond .row label{font-size:11px; color:var(--dim)}
+#pane-cond select, #pane-cond input[type=text]{background:var(--panel-2); border:1px solid var(--line);
+  border-radius:var(--r); padding:4px 7px; font-size:11px; font-family:var(--mono); width:100%}
+#pane-cond /* ---- plots ---- */
+.plot canvas{width:100%; display:block; border-radius:2px}
+#pane-cond .plot .cap{font-family:var(--mono); font-size:10px; color:var(--faint);
+  margin-top:5px; text-align:center}
+#pane-cond .grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px}
+#pane-cond /* ---- tables ---- */
+.tbl{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:10.5px}
+#pane-cond .tbl th{text-align:right; color:var(--dim); font-weight:500; padding:5px 7px;
+  border-bottom:1px solid var(--line); font-size:9.5px; letter-spacing:.04em;
+  text-transform:uppercase; white-space:nowrap; position:sticky; top:0; background:var(--panel)}
+#pane-cond .tbl th:first-child, #pane-cond .tbl td:first-child{text-align:left}
+#pane-cond /* units must not be uppercased: CSS turns µ into Greek capital Mu, #pane-cond so "µM"
+   renders as "MM" and the reader has no idea what scale they are looking at */
+.tbl th .u{text-transform:none}
+#pane-cond .tbl td{padding:4px 7px; border-bottom:1px solid #22303F; text-align:right;
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+#pane-cond .tbl tr:hover td{background:var(--panel-2)}
+#pane-cond .tblScroll{max-height:340px; overflow:auto}
+#pane-cond .sig{font-weight:700}
+#pane-cond .sig.y{color:var(--ok)}
+#pane-cond .sig.n{color:var(--faint)}
+#pane-cond .pill{display:inline-block; padding:0 5px; border-radius:8px; font-size:9.5px;
+  border:1px solid var(--line); color:var(--dim)}
+#pane-cond /* ---- warnings ---- */
+.warn{border-left:3px solid var(--warn); background:rgba(255,162,61,.07);
+  padding:9px 12px; border-radius:var(--r); font-size:11.5px; line-height:1.55;
+  color:var(--ink); margin-bottom:12px}
+#pane-cond .warn b{color:var(--warn)}
+#pane-cond .warn.bad{border-left-color:var(--bad); background:rgba(255,84,112,.07)}
+#pane-cond .warn.bad b{color:var(--bad)}
+#pane-cond /* ---- drop ---- */
+#C-drop{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:20px; background:var(--void); z-index:50; padding:24px}
+#pane-cond #C-drop.hide{display:none}
+#pane-cond .dz{border:1px dashed var(--line); border-radius:6px; padding:42px 52px; text-align:center; max-width:640px}
+#pane-cond .dz.hot{border-color:var(--g0); background:rgba(86,180,233,.05)}
+#pane-cond .dz h1{font-size:23px; font-weight:700; letter-spacing:-.025em; margin-bottom:6px}
+#pane-cond .dz h1 em{font-style:normal; color:var(--g0)}
+#pane-cond .dz p{color:var(--dim); font-size:12.5px; margin-bottom:18px; line-height:1.6}
+#pane-cond .dz code{font-family:var(--mono); font-size:11.5px; color:var(--g1);
+  background:var(--panel); padding:1px 5px; border-radius:2px}
+#pane-cond .swatches{display:flex; gap:4px; justify-content:center; margin-bottom:24px}
+#pane-cond .swatches i{width:30px; height:4px; border-radius:2px; display:block}
+#pane-cond #C-err{color:var(--bad); font-family:var(--mono); font-size:11.5px; max-width:640px;
+  text-align:center; min-height:17px}
+#pane-cond #C-busy{position:fixed;inset:0;background:rgba(11,16,23,.82);display:none;align-items:center;
+  justify-content:center;z-index:60;font-family:var(--mono);font-size:12px;color:var(--g0)}
+#pane-cond #C-busy.on{display:flex}
+#pane-cond ::-webkit-scrollbar{width:9px;height:9px}
+#pane-cond ::-webkit-scrollbar-track{background:var(--void)}
+#pane-cond ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+@media (prefers-reduced-motion:reduce){#pane-cond *{transition:none!important}}
+@media (max-width:900px){#pane-cond main{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
-<div id="drop">
+<div id="wbDrop">
+  <div class="steps"><i>load once</i><i>gate the cells</i><i>compare conditions</i></div>
+  <div class="wbdz" id="wbDz">
+    <h1>nucleoflow <em>workbench</em></h1>
+    <p>Drop a <code>per_nucleus_measurements.csv</code> here.<br>
+       Set the gates on the first tab, then compare conditions and fit IC50s on
+       the second — <br>both tabs work on the same cells, so a gate you move
+       changes the analysis downstream.<br>
+       A <code>per_well_summary.csv</code> also works, but only the second tab.</p>
+    <button class="wbtn" id="wbPick" style="margin:0">Choose a file</button>
+    <input type="file" id="wbFileInput" accept=".csv,.gz,.tsv,.txt" hidden>
+  </div>
+  <div id="wbErr"></div>
+</div>
+<div id="wbBusy">reading…</div>
+<div id="wbNote" role="status" aria-live="polite"></div>
+
+<div id="wb">
+  <div id="tabs">
+    <div class="brand">nucleoflow <span>workbench</span></div>
+    <button class="tab on" id="tabGate"><span class="num">1</span> Gating</button>
+    <button class="tab" id="tabCond"><span class="num">2</span> Conditions &amp; IC50</button>
+    <div class="sp"></div>
+    <div id="wbFile">—</div>
+    <button class="wbtn" id="wbSync" title="push the current gates into the analysis tab">Apply gates →</button>
+    <button class="wbtn" id="wbNew">New file</button>
+  </div>
+  <div id="panes">
+    <div class="pane on" id="pane-gate">
+
+<div id="G-drop">
+  <div class="spectrum">
+    <i style="background:var(--c405)"></i><i style="background:var(--c488)"></i>
+    <i style="background:var(--c561)"></i><i style="background:var(--c640)"></i>
+    <i style="background:var(--c680)"></i>
+  </div>
+  <div class="dz" id="G-dz">
+    <h1>Gating <em>Explorer</em></h1>
+    <p>Drop a <code>per_nucleus_measurements.csv</code> here to re-gate it by hand.<br>
+       Include or exclude wells, switch markers on and off, drag the thresholds,<br>
+       and watch the populations recompute. Nothing leaves your computer.</p>
+    <button class="btn primary" id="G-pick">Choose a file</button>
+    <input type="file" id="G-file" accept=".csv,.gz,.tsv,.txt" hidden>
+    <p class="hint" style="margin:18px 0 0">.csv or .csv.gz &nbsp;·&nbsp; up to ~1M nuclei</p>
+  </div>
+  <div id="G-err"></div>
+</div>
+
+<div id="G-busy">reading…</div>
+<div id="G-toast" role="status" aria-live="polite"></div>
+
+<div id="G-app">
+  <header>
+    <div class="brand">Gating <span>Explorer</span></div>
+    <div class="stat" id="G-sFile">—</div>
+    <div class="stat">cells <b id="G-sCells">0</b> / <b id="G-sTotal">0</b></div>
+    <div class="stat">wells <b id="G-sWells">0</b></div>
+    <div class="stat">markers <b id="G-sMark">0</b></div>
+    <div class="sp"></div>
+    <button class="btn" id="G-bReset">Reset gates</button>
+    <button class="btn" id="G-bWells">All wells</button>
+    <button class="btn primary" id="G-bExport">Export summary</button>
+    <button class="btn" id="G-bNew">New file</button>
+  </header>
+
+  <main>
+    <aside>
+      <section>
+        <div class="sec-h"><span>Plate</span><span class="n" id="G-plateName"></span>
+          <button class="act" id="G-invert">invert</button></div>
+        <div id="G-plateWrap"><table id="G-plate"></table></div>
+        <div class="legend"><span id="G-rampLo">0</span>
+          <div class="ramp" id="G-ramp"></div><span id="G-rampHi">100</span></div>
+        <div class="row" style="margin-top:8px">
+          <select id="G-plateMetric"></select>
+        </div>
+        <div class="hint" style="margin-top:6px" id="G-wellHint">Click a well to exclude it.</div>
+      </section>
+
+      <section>
+        <div class="sec-h"><span>Markers</span>
+          <button class="act" id="G-allMark">all on</button></div>
+        <div id="G-chans"></div>
+        <div class="hint" style="margin-top:8px">Switched-off markers are ignored when
+          counting single / double / triple.</div>
+      </section>
+
+      <section>
+        <div class="sec-h"><span>Measurement</span></div>
+        <div class="row"><label for="G-stat">Intensity</label></div>
+        <select id="G-stat"></select>
+        <div class="row" style="margin-top:10px"><label for="G-plate2">Plate</label></div>
+        <select id="G-plate2"></select>
+      </section>
+    </aside>
+
+    <div class="work">
+      <section class="card" id="G-qcCard">
+        <div class="sec-h"><span>Cell filter</span>
+          <span class="n">keep a window on each — like an FSC/SSC gate before you look at fluorescence</span>
+          <button class="act" id="G-qcAuto">auto</button>
+          <button class="act" id="G-qcOff" style="margin-left:10px">clear</button></div>
+        <div class="split" style="grid-template-columns:minmax(360px,1.7fr) minmax(240px,0.8fr)">
+          <div>
+            <div class="qcGrid" id="G-qcGrid"></div>
+            <div class="qcNote" id="G-qcNote" style="margin-top:10px"></div>
+          </div>
+          <div class="morphPane">
+            <div class="morphPick">
+              <select id="G-mX"></select><span>vs</span><select id="G-mY"></select>
+            </div>
+            <div class="plot"><canvas id="G-cMorph"></canvas>
+              <div class="cap">shaded band = cells the filter keeps</div></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="split">
+        <section class="card">
+          <div class="sec-h"><span>Gates</span><span class="n">drag a line, or type a value</span></div>
+          <div id="G-gates"></div>
+        </section>
+
+        <section class="card" id="G-biWrap">
+          <div class="sec-h"><span>Biaxial</span><span class="n" id="G-biNote"></span></div>
+          <div class="grid2" id="G-biGrid"></div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="sec-h"><span>Populations</span><span class="n" id="G-popNote"></span></div>
+        <div class="grid2">
+          <div class="plot"><canvas id="G-cPop"></canvas><div class="cap">composition per well</div></div>
+          <div class="plot"><canvas id="G-cCnt"></canvas><div class="cap">cells per well</div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="sec-h"><span>Per-well summary</span>
+          <span class="n" id="G-tblNote"></span></div>
+        <div class="tblScroll"><table class="tbl" id="G-tbl"></table></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+
+
+</div>
+    <div class="pane" id="pane-cond">
+
+<div id="C-drop">
   <div class="swatches">
     <i style="background:var(--g0)"></i><i style="background:var(--g1)"></i>
     <i style="background:var(--g2)"></i><i style="background:var(--g3)"></i>
     <i style="background:var(--g4)"></i><i style="background:var(--g5)"></i>
   </div>
-  <div class="dz" id="dz">
+  <div class="dz" id="C-dz">
     <h1>Condition <em>Explorer</em></h1>
     <p>Group replicate wells into conditions, then compare them properly.<br>
        Drop a <code>per_well_summary.csv</code> — or a per-nucleus file, or the
        export from the Gating Explorer.<br>
        Every well is one replicate. Nothing leaves your computer.</p>
-    <button class="btn primary" id="pick">Choose a file</button>
-    <input type="file" id="file" accept=".csv,.gz,.tsv,.txt" hidden>
+    <button class="btn primary" id="C-pick">Choose a file</button>
+    <input type="file" id="C-file" accept=".csv,.gz,.tsv,.txt" hidden>
   </div>
-  <div id="err"></div>
+  <div id="C-err"></div>
 </div>
-<div id="busy">reading…</div>
+<div id="C-busy">reading…</div>
 
-<div id="app">
+<div id="C-app">
   <header>
     <div class="brand">Condition <span>Explorer</span></div>
-    <div class="stat" id="sFile">—</div>
-    <div class="stat">wells <b id="sWells">0</b></div>
-    <div class="stat">groups <b id="sGroups">0</b></div>
-    <div class="stat" id="sDesign">—</div>
+    <div class="stat" id="C-sFile">—</div>
+    <div class="stat">wells <b id="C-sWells">0</b></div>
+    <div class="stat">groups <b id="C-sGroups">0</b></div>
+    <div class="stat" id="C-sDesign">—</div>
     <div class="sp"></div>
-    <button class="btn" id="bAuto">Auto-group</button>
-    <button class="btn" id="bClear">Clear groups</button>
-    <button class="btn primary" id="bExport">Export report</button>
-    <button class="btn" id="bNew">New file</button>
+    <button class="btn" id="C-bAuto">Auto-group</button>
+    <button class="btn" id="C-bClear">Clear groups</button>
+    <button class="btn primary" id="C-bExport">Export report</button>
+    <button class="btn" id="C-bNew">New file</button>
   </header>
   <main>
     <aside>
       <section>
-        <div class="sec-h"><span>Plate</span><span class="n" id="plateName"></span></div>
-        <div id="plateWrap"><table id="plate"></table></div>
-        <div class="hint" style="margin-top:8px" id="paintHint"></div>
+        <div class="sec-h"><span>Plate</span><span class="n" id="C-plateName"></span></div>
+        <div id="C-plateWrap"><table id="C-plate"></table></div>
+        <div class="hint" style="margin-top:8px" id="C-paintHint"></div>
       </section>
       <section>
         <div class="sec-h"><span>Design</span></div>
-        <select id="mode">
+        <select id="C-mode">
           <option value="one">One factor — conditions compared pairwise</option>
           <option value="two">Two factors — crossed, with interaction</option>
           <option value="dose">Dose–response — IC50 per compound</option>
         </select>
       </section>
 
-      <section id="paneOne">
+      <section id="C-paneOne">
         <div class="sec-h"><span>Conditions</span>
-          <button class="act" id="addGrp">+ add</button></div>
-        <div id="groups"></div>
-        <div class="row" style="margin-top:10px"><label for="autoCol">Auto-group by</label></div>
-        <select id="autoCol"></select>
+          <button class="act" id="C-addGrp">+ add</button></div>
+        <div id="C-groups"></div>
+        <div class="row" style="margin-top:10px"><label for="C-autoCol">Auto-group by</label></div>
+        <select id="C-autoCol"></select>
         <div class="row" style="margin-top:12px"><label>Assay controls (for Z′)</label></div>
-        <select id="ctrlNeg"></select>
+        <select id="C-ctrlNeg"></select>
         <div style="height:6px"></div>
-        <select id="ctrlPos"></select>
+        <select id="C-ctrlPos"></select>
       </section>
 
-      <section id="paneTwo" style="display:none">
+      <section id="C-paneTwo" style="display:none">
         <div class="sec-h"><span>Factors</span>
           <span class="n">crossed</span>
-          <button class="act" id="clearF">clear</button>
-          <button class="act" id="swapF" style="margin-left:10px">swap A/B</button></div>
-        <div class="roles" id="roles"></div>
+          <button class="act" id="C-clearF">clear</button>
+          <button class="act" id="C-swapF" style="margin-left:10px">swap A/B</button></div>
+        <div class="roles" id="C-roles"></div>
         <div class="fhdr">
-          <span class="fkey" id="keyA">A</span>
-          <input class="fname" id="nameA" title="rename this factor">
+          <span class="fkey" id="C-keyA">A</span>
+          <input class="fname" id="C-nameA" title="rename this factor">
           <button class="act" data-addlev="A">+ level</button>
         </div>
-        <select id="colA" title="build the levels from a metadata column"></select>
-        <div id="levA"></div>
+        <select id="C-colA" title="build the levels from a metadata column"></select>
+        <div id="C-levA"></div>
 
         <div class="fhdr" style="margin-top:14px">
-          <span class="fkey" id="keyB">B</span>
-          <input class="fname" id="nameB" title="rename this factor">
+          <span class="fkey" id="C-keyB">B</span>
+          <input class="fname" id="C-nameB" title="rename this factor">
           <button class="act" data-addlev="B">+ level</button>
         </div>
-        <select id="colB" title="build the levels from a metadata column"></select>
-        <div id="levB"></div>
-        <div class="row" style="margin-top:12px"><label for="paint">Clicking a well sets</label></div>
-        <select id="paint">
+        <select id="C-colB" title="build the levels from a metadata column"></select>
+        <div id="C-levB"></div>
+        <div class="row" style="margin-top:12px"><label for="C-paint">Clicking a well sets</label></div>
+        <select id="C-paint">
           <option value="AB">both factors</option>
           <option value="A">factor A only</option>
           <option value="B">factor B only</option>
         </select>
-        <div class="row" style="margin-top:10px" id="ssRow"><label for="ssType">Sums of squares</label></div>
-        <select id="ssType">
+        <div class="row" style="margin-top:10px" id="C-ssRow"><label for="C-ssType">Sums of squares</label></div>
+        <select id="C-ssType">
           <option value="2">Type II (default)</option>
           <option value="3">Type III</option>
         </select>
-        <div id="doseOpts" style="display:none">
-          <div class="row" style="margin-top:10px"><label for="split">Split cells by</label></div>
-          <select id="split"></select>
-          <div class="hint" id="splitHint" style="margin-top:6px"></div>
-          <div class="row" style="margin-top:10px"><label for="unit">Concentration unit</label></div>
-          <select id="unit">
+        <div id="C-doseOpts" style="display:none">
+          <div class="row" style="margin-top:10px"><label for="C-split">Split cells by</label></div>
+          <select id="C-split"></select>
+          <div class="hint" id="C-splitHint" style="margin-top:6px"></div>
+          <div class="row" style="margin-top:10px"><label for="C-unit">Concentration unit</label></div>
+          <select id="C-unit">
             <option value="nM">nM</option>
             <option value="µM">µM</option>
             <option value="mM">mM</option>
@@ -295,37 +702,37 @@ select,input[type=text]{background:var(--panel-2); border:1px solid var(--line);
             <option value="Gy">Gy</option>
             <option value="">no unit</option>
           </select>
-          <div class="row" style="margin-top:10px"><label for="norm">Normalise to</label></div>
-          <select id="norm">
+          <div class="row" style="margin-top:10px"><label for="C-norm">Normalise to</label></div>
+          <select id="C-norm">
             <option value="raw">nothing — raw readout</option>
             <option value="vehicle">vehicle (0 dose) = 100%</option>
             <option value="inhib">% inhibition (vehicle = 0%, max effect = 100%)</option>
           </select>
-          <div class="row" style="margin-top:10px"><label for="constrain">Constrain curve</label></div>
-          <select id="constrain">
+          <div class="row" style="margin-top:10px"><label for="C-constrain">Constrain curve</label></div>
+          <select id="C-constrain">
             <option value="free">free top and bottom</option>
             <option value="bottom0">bottom = 0</option>
             <option value="top100">top = 100</option>
             <option value="both">top = 100, bottom = 0</option>
           </select>
-          <div class="row" style="margin-top:10px"><label for="si">Selectivity vs</label></div>
-          <select id="si"></select>
+          <div class="row" style="margin-top:10px"><label for="C-si">Selectivity vs</label></div>
+          <select id="C-si"></select>
         </div>
-        <div class="hint" style="margin-top:8px" id="twoHint"></div>
+        <div class="hint" style="margin-top:8px" id="C-twoHint"></div>
       </section>
       <section>
         <div class="sec-h"><span>Readout</span></div>
-        <select id="metric"></select>
-        <div class="row" style="margin-top:10px"><label for="ref">Reference condition</label></div>
-        <select id="ref"></select>
-        <div class="row" style="margin-top:10px"><label for="test">Test</label></div>
-        <select id="test">
+        <select id="C-metric"></select>
+        <div class="row" style="margin-top:10px"><label for="C-ref">Reference condition</label></div>
+        <select id="C-ref"></select>
+        <div class="row" style="margin-top:10px"><label for="C-test">Test</label></div>
+        <select id="C-test">
           <option value="welch">Welch t / Welch ANOVA (default)</option>
           <option value="student">Student t / one-way ANOVA</option>
           <option value="rank">Mann–Whitney / Kruskal–Wallis</option>
         </select>
-        <div class="row" style="margin-top:10px"><label for="corr">Correction</label></div>
-        <select id="corr">
+        <div class="row" style="margin-top:10px"><label for="C-corr">Correction</label></div>
+        <select id="C-corr">
           <option value="holm">Holm (family-wise)</option>
           <option value="bh">Benjamini–Hochberg (FDR)</option>
           <option value="none">None</option>
@@ -334,61 +741,1416 @@ select,input[type=text]{background:var(--panel-2); border:1px solid var(--line);
     </aside>
 
     <div class="work">
-      <div id="warnings"></div>
-      <section class="card" id="ovCard">
-        <div class="sec-h"><span>Overview</span><span class="n" id="ovNote"></span></div>
+      <div id="C-warnings"></div>
+      <section class="card" id="C-ovCard">
+        <div class="sec-h"><span>Overview</span><span class="n" id="C-ovNote"></span></div>
         <div class="grid2">
-          <div class="plot"><canvas id="cSuper"></canvas>
+          <div class="plot"><canvas id="C-cSuper"></canvas>
             <div class="cap">every dot is one well · bar = mean · whiskers = 95% CI</div></div>
-          <div class="plot"><canvas id="cEffect"></canvas>
-            <div class="cap" id="effCap">difference from reference · bootstrap 95% CI</div></div>
+          <div class="plot"><canvas id="C-cEffect"></canvas>
+            <div class="cap" id="C-effCap">difference from reference · bootstrap 95% CI</div></div>
         </div>
       </section>
-      <section class="card" id="qcCard" style="display:none">
-        <div class="sec-h"><span>Assay quality</span><span class="n" id="qcTitle"></span></div>
-        <div id="qcOut"></div>
+      <section class="card" id="C-qcCard" style="display:none">
+        <div class="sec-h"><span>Assay quality</span><span class="n" id="C-qcTitle"></span></div>
+        <div id="C-qcOut"></div>
       </section>
 
-      <section class="card" id="drCard" style="display:none">
-        <div class="sec-h"><span>Dose–response</span><span class="n" id="drTitle"></span></div>
-        <div class="plot" style="margin-bottom:14px"><canvas id="cDose"></canvas>
-          <div class="cap" id="drCap">points are well values · curve is a four-parameter logistic fit</div></div>
-        <div class="tblScroll"><table class="tbl" id="tDose"></table></div>
-        <div id="cmpOut"></div>
-        <div id="siOut"></div>
-        <div class="hint" style="margin-top:10px" id="drNote"></div>
+      <section class="card" id="C-drCard" style="display:none">
+        <div class="sec-h"><span>Dose–response</span><span class="n" id="C-drTitle"></span></div>
+        <div class="plot" style="margin-bottom:14px"><canvas id="C-cDose"></canvas>
+          <div class="cap" id="C-drCap">points are well values · curve is a four-parameter logistic fit</div></div>
+        <div class="tblScroll"><table class="tbl" id="C-tDose"></table></div>
+        <div id="C-cmpOut"></div>
+        <div id="C-siOut"></div>
+        <div class="hint" style="margin-top:10px" id="C-drNote"></div>
       </section>
 
-      <section class="card" id="twCard" style="display:none">
-        <div class="sec-h"><span>Two-way ANOVA</span><span class="n" id="twTitle"></span></div>
+      <section class="card" id="C-twCard" style="display:none">
+        <div class="sec-h"><span>Two-way ANOVA</span><span class="n" id="C-twTitle"></span></div>
         <div class="grid2" style="margin-bottom:14px">
-          <div class="plot"><canvas id="cInter"></canvas>
+          <div class="plot"><canvas id="C-cInter"></canvas>
             <div class="cap">cell means · parallel lines = no interaction</div></div>
-          <div id="twoway"></div>
+          <div id="C-twoway"></div>
         </div>
-        <div id="twPost"></div>
-        <div class="hint" id="twNote" style="margin-top:12px"></div>
+        <div id="C-twPost"></div>
+        <div class="hint" id="C-twNote" style="margin-top:12px"></div>
       </section>
 
-      <section class="card" id="grpCard">
+      <section class="card" id="C-grpCard">
         <div class="sec-h"><span>Per condition</span><span class="n">n = wells, not cells</span></div>
-        <div class="tblScroll"><table class="tbl" id="tGroup"></table></div>
+        <div class="tblScroll"><table class="tbl" id="C-tGroup"></table></div>
       </section>
-      <section class="card" id="cmpCard">
-        <div class="sec-h"><span>Comparisons</span><span class="n" id="omni"></span></div>
-        <div class="tblScroll"><table class="tbl" id="tPair"></table></div>
-        <div class="hint" style="margin-top:10px" id="testNote"></div>
+      <section class="card" id="C-cmpCard">
+        <div class="sec-h"><span>Comparisons</span><span class="n" id="C-omni"></span></div>
+        <div class="tblScroll"><table class="tbl" id="C-tPair"></table></div>
+        <div class="hint" style="margin-top:10px" id="C-testNote"></div>
       </section>
       <section class="card">
-        <div class="sec-h"><span>Wells</span><span class="n" id="wellNote"></span></div>
-        <div class="tblScroll"><table class="tbl" id="tWell"></table></div>
+        <div class="sec-h"><span>Wells</span><span class="n" id="C-wellNote"></span></div>
+        <div class="tblScroll"><table class="tbl" id="C-tWell"></table></div>
       </section>
     </div>
   </main>
 </div>
 
+
+
+</div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.inflate.min.js"></script>
 <script>
+(function(){
+  /* --- pane isolation -------------------------------------------------
+     `document` is shadowed for the app inside this closure: ids get the
+     pane prefix, and element queries are scoped to the pane's subtree.
+     The app's own code needs no changes. */
+  const __ROOT = window.document.getElementById("pane-gate");
+  const __PFX  = "G-";
+  const document = new Proxy(window.document, {
+    get(t, k){
+      if(k === "getElementById") return id => __ROOT.querySelector("#" + CSS.escape(__PFX + id));
+      if(k === "querySelector")  return s  => __ROOT.querySelector(s);
+      if(k === "querySelectorAll") return s => __ROOT.querySelectorAll(s);
+      const v = t[k];
+      return typeof v === "function" ? v.bind(t) : v;
+    }
+  });
+
+
+"use strict";
+/* ============================================================
+   Gating Explorer — post-hoc interactive re-gating
+   Companion to omero_nuclei_flow.py. Runs entirely in the browser.
+   ============================================================ */
+
+const CH_COLORS = ["--c488","--c561","--c640","--c680","--c405"];
+const POP_NAMES = ["negative","single","double","triple","quadruple","quintuple"];
+const POP_COLORS = ["#415470","#5E82A8","#3FD16B","#FFD84D","#FFA23D","#FF5470"];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+const S = {              // application state
+  name:"", rows:0, cols:{}, header:[],
+  wells:[], wellIdx:new Map(), wellOn:new Set(),
+  plates:[], plate:null,
+  markers:[], markerOn:new Set(), dapi:null,
+  stats:[], stat:"mean",
+  thr:{}, autoThr:{},
+  active:null,           // Int32Array of active row indices
+  pop:null, popCount:null, perWell:null,
+  metric:"pct_double",
+};
+
+/* ---------- CSV parsing ------------------------------------ */
+function parseCSV(text){
+  const nl = text.indexOf("\n");
+  if(nl < 0) throw new Error("That file has no rows.");
+  const delim = (() => {
+    const h = text.slice(0, nl);
+    const n = { ",":0, "\t":0, ";":0 };
+    for(const c of h) if(c in n) n[c]++;
+    return Object.keys(n).reduce((a,b)=> n[a] >= n[b] ? a : b);
+  })();
+
+  const splitLine = line => {
+    const out = []; let cur = "", q = false;
+    for(let i=0;i<line.length;i++){
+      const c = line[i];
+      if(q){
+        if(c === '"'){ if(line[i+1] === '"'){cur+='"';i++;} else q=false; }
+        else cur += c;
+      } else if(c === '"') q = true;
+      else if(c === delim){ out.push(cur); cur=""; }
+      else if(c !== "\r") cur += c;
+      else {}
+    }
+    out.push(cur); return out;
+  };
+
+  const header = splitLine(text.slice(0, nl));
+  const lines = text.split("\n");
+  let n = 0;
+  for(let i=1;i<lines.length;i++) if(lines[i].length > 1) n++;
+  if(!n) throw new Error("That file has a header but no data rows.");
+
+  // First pass on a sample decides numeric vs text per column.
+  const sample = Math.min(n, 400);
+  const numeric = header.map(()=>true);
+  let seen = 0;
+  for(let i=1;i<lines.length && seen<sample;i++){
+    if(lines[i].length < 2) continue;
+    const f = splitLine(lines[i]); seen++;
+    for(let c=0;c<header.length;c++){
+      const v = f[c];
+      if(v === undefined || v === "" || v === "NA" || v === "NaN") continue;
+      if(!numeric[c]) continue;
+      if(v === "True" || v === "False") continue;      // booleans stay numeric
+      if(!isFinite(Number(v))) numeric[c] = false;
+    }
+  }
+
+  const cols = {};
+  header.forEach((h,c)=>{ cols[h] = numeric[c] ? new Float32Array(n) : new Array(n); });
+
+  let r = 0;
+  for(let i=1;i<lines.length;i++){
+    if(lines[i].length < 2) continue;
+    const f = splitLine(lines[i]);
+    for(let c=0;c<header.length;c++){
+      const h = header[c], v = f[c];
+      if(numeric[c]){
+        cols[h][r] = (v === "True") ? 1 : (v === "False") ? 0
+                   : (v === undefined || v === "") ? NaN : Number(v);
+      } else cols[h][r] = v === undefined ? "" : v;
+    }
+    r++;
+  }
+  return { header, cols, rows:r };
+}
+
+/* ---------- thresholds ------------------------------------- */
+// Otsu on log1p, matching the Python pipeline's transform.
+function otsu(vals, idx){
+  const N = 512; const hist = new Float64Array(N);
+  let lo = Infinity, hi = -Infinity, cnt = 0;
+  for(const i of idx){ const v = Math.log1p(Math.max(vals[i],0));
+    if(!isFinite(v)) continue; if(v<lo)lo=v; if(v>hi)hi=v; cnt++; }
+  if(cnt < 20 || hi <= lo) return NaN;
+  const sc = (N-1)/(hi-lo);
+  for(const i of idx){ const v = Math.log1p(Math.max(vals[i],0));
+    if(isFinite(v)) hist[Math.round((v-lo)*sc)]++; }
+  let sum = 0; for(let i=0;i<N;i++) sum += i*hist[i];
+  let sumB=0, wB=0, best=-1, k=0;
+  for(let i=0;i<N;i++){
+    wB += hist[i]; if(!wB) continue;
+    const wF = cnt - wB; if(!wF) break;
+    sumB += i*hist[i];
+    const d = (sumB/wB) - ((sum-sumB)/wF);
+    const between = wB*wF*d*d;
+    if(between > best){ best = between; k = i; }
+  }
+  return Math.expm1(lo + k/sc);
+}
+
+// If the file already has pos_<marker>, recover the threshold that produced it,
+// so the explorer opens showing exactly the numbers in the student's report.
+function impliedThreshold(vals, pos, idx){
+  let maxNeg = -Infinity, minPos = Infinity, nP = 0, nN = 0;
+  for(const i of idx){
+    const v = vals[i]; if(!isFinite(v)) continue;
+    if(pos[i] > 0.5){ if(v < minPos) minPos = v; nP++; }
+    else { if(v > maxNeg) maxNeg = v; nN++; }
+  }
+  if(!nP || !nN) return NaN;
+  if(minPos <= maxNeg) return NaN;               // stored calls weren't a simple cut
+  return 0.5*(maxNeg + minPos);
+}
+
+/* ---------- display transform ------------------------------ */
+const asinh = (x,c) => Math.asinh(x/c);
+function cofactor(vals, idx){
+  const s = [];
+  const step = Math.max(1, Math.floor(idx.length/4000));
+  for(let i=0;i<idx.length;i+=step){ const v = Math.abs(vals[idx[i]]); if(isFinite(v)) s.push(v); }
+  if(!s.length) return 1;
+  s.sort((a,b)=>a-b);
+  return Math.max(1, 0.5*s[Math.floor(s.length*0.25)]);
+}
+
+/* ---------- load ------------------------------------------- */
+function detect(){
+  const h = S.header;
+  S.stats = ["mean","median","integrated"].filter(s => h.some(c => c.startsWith(s+"_")));
+  if(!S.stats.length) throw new Error(
+    "No intensity columns found. Expected columns like mean_DAPI, mean_GFP — "+
+    "is this a per_nucleus_measurements file?");
+  S.stat = S.stats.includes("mean") ? "mean" : S.stats[0];
+
+  S.dapi = null;
+  if(h.includes("dapi_channel")){
+    const v = S.cols["dapi_channel"];
+    S.dapi = typeof v[0] === "string" ? v[0] : null;
+  }
+  const all = h.filter(c => c.startsWith(S.stat+"_")).map(c => c.slice(S.stat.length+1))
+               .filter(c => !c.startsWith("intensity"));
+  if(!S.dapi){
+    const g = all.find(c => /dapi|hoechst|405|dna|nuc/i.test(c));
+    S.dapi = g || null;
+  }
+  S.markers = all.filter(c => c !== S.dapi);
+  if(!S.markers.length) throw new Error("Only a nuclear channel was found — nothing to gate.");
+  S.markerOn = new Set(S.markers);
+
+  // plates
+  const pl = S.cols["plate"];
+  S.plates = pl ? [...new Set(Array.from(pl))] : ["(all)"];
+  S.plate = S.plates[0];
+
+  buildWells();
+}
+
+function buildWells(){
+  const w = S.cols["well"], pl = S.cols["plate"];
+  S.wellIdx = new Map();
+  for(let i=0;i<S.rows;i++){
+    if(pl && String(pl[i]) !== String(S.plate)) continue;
+    const k = w ? String(w[i]) : "all";
+    let a = S.wellIdx.get(k); if(!a){ a = []; S.wellIdx.set(k, a); }
+    a.push(i);
+  }
+  S.wells = [...S.wellIdx.keys()].sort(cmpWell);
+  for(const [k,a] of S.wellIdx) S.wellIdx.set(k, Int32Array.from(a));
+  S.wellOn = new Set(S.wells);
+}
+function cmpWell(a,b){
+  const ra = /^([A-Z]+)(\d+)$/i.exec(a), rb = /^([A-Z]+)(\d+)$/i.exec(b);
+  if(ra && rb) return ra[1] === rb[1] ? (+ra[2]) - (+rb[2]) : ra[1].localeCompare(rb[1]);
+  return String(a).localeCompare(String(b));
+}
+function wellRC(k){
+  const r = /^([A-Z]+)(\d+)$/i.exec(k);
+  if(!r) return null;
+  let row = 0; for(const c of r[1].toUpperCase()) row = row*26 + (c.charCodeAt(0)-64);
+  return { row: row-1, col: (+r[2])-1 };
+}
+
+function initThresholds(){
+  const idx = allIdx();
+  for(const m of S.markers){
+    const v = S.cols[`${S.stat}_${m}`];
+    let t = NaN;
+    if(S.cols[`pos_${m}`]) t = impliedThreshold(v, S.cols[`pos_${m}`], idx);
+    if(!isFinite(t)) t = otsu(v, idx);
+    S.autoThr[m] = t; S.thr[m] = t;
+  }
+}
+function allIdx(){
+  const out = [];
+  for(const k of S.wells) for(const i of S.wellIdx.get(k)) out.push(i);
+  return Int32Array.from(out);
+}
+
+/* ---------- cell filter (QC pre-gate) -----------------------
+   A window on the nuclear stain and on shape, applied BEFORE any
+   marker gating - the same move as drawing an FSC/SSC gate before
+   you look at fluorescence. Debris, clumps and dying nuclei are
+   removed once, and everything downstream inherits the selection.
+   ------------------------------------------------------------ */
+const MORPH_META = {
+  area:        { label:"nuclear area",  unit:"px",  log:false },
+  eccentricity:{ label:"eccentricity",  unit:"0–1", log:false },
+  solidity:    { label:"solidity",      unit:"0–1", log:false },
+  perimeter:   { label:"perimeter",     unit:"px",  log:false },
+};
+
+let toastTimer = null;
+function toast(html, ms = 7000){
+  const el = document.getElementById("toast");
+  if(!el) return;
+  el.innerHTML = html;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove("show"), ms);
+}
+
+/** Where does `value` sit in `col`, as a fraction of the cells below it? */
+function percentileOf(col, value, idx){
+  const v = S.cols[col]; if(!v) return null;
+  let below = 0, n = 0;
+  const step = Math.max(1, Math.floor(idx.length/20000));
+  for(let i=0;i<idx.length;i+=step){ const x = v[idx[i]];
+    if(!isFinite(x)) continue; n++; if(x <= value) below++; }
+  return n ? below/n : null;
+}
+/** The value at fraction `q` of `col` - the inverse of the above. */
+function quantileOf(col, q, idx){
+  const v = S.cols[col]; if(!v) return null;
+  const s = [];
+  const step = Math.max(1, Math.floor(idx.length/20000));
+  for(let i=0;i<idx.length;i+=step){ const x = v[idx[i]]; if(isFinite(x)) s.push(x); }
+  if(!s.length) return null;
+  s.sort((a,b)=>a-b);
+  return s[Math.min(s.length-1, Math.max(0, Math.round(q*(s.length-1))))];
+}
+/** Carry a limit across a change of intensity statistic by keeping its
+ *  position in the distribution, not its raw number. 1200 counts on the mean
+ *  is meaningless on integrated intensity, but "the 97th percentile" is not. */
+function rescale(oldCol, newCol, value, idx){
+  const q = percentileOf(oldCol, value, idx);
+  if(q === null) return null;
+  return quantileOf(newCol, q, idx);
+}
+
+function detectQC(){
+  const keys = [];
+  if(S.dapi && S.cols[`${S.stat}_${S.dapi}`])
+    keys.push({ key:`${S.stat}_${S.dapi}`, label:S.dapi, kind:"nuclear stain", log:true });
+  for(const m of Object.keys(MORPH_META))
+    if(S.cols[m]) keys.push({ key:m, label:MORPH_META[m].label,
+                              kind:MORPH_META[m].unit, log:MORPH_META[m].log });
+  S.qcKeys = keys;
+  const prev = S.qc || {};
+  S.qc = {};
+  for(const k of keys){
+    const [lo,hi] = dataRange(k.key);
+    // Morphology columns don't depend on the intensity statistic, so an
+    // existing window is carried over untouched rather than reset.
+    S.qc[k.key] = prev[k.key]
+      ? { ...prev[k.key], min:lo, max:hi }
+      : { on:false, lo, hi, min:lo, max:hi };
+  }
+}
+function dataRange(col){
+  const v = S.cols[col];
+  let lo = Infinity, hi = -Infinity;
+  for(let i=0;i<S.rows;i++){ const x = v[i];
+    if(!isFinite(x)) continue; if(x<lo)lo=x; if(x>hi)hi=x; }
+  if(!(hi>lo)){ lo = 0; hi = 1; }
+  return [lo,hi];
+}
+/** Robust window: central 98% of the cells currently in play. */
+function autoWindow(col){
+  const v = S.cols[col], src = S.preActive || S.active;
+  const s = [];
+  const step = Math.max(1, Math.floor(src.length/20000));
+  for(let i=0;i<src.length;i+=step){ const x = v[src[i]]; if(isFinite(x)) s.push(x); }
+  if(s.length < 20) return null;
+  s.sort((a,b)=>a-b);
+  return [s[Math.floor(s.length*0.01)], s[Math.floor(s.length*0.99)]];
+}
+function qcPass(i){
+  for(const k of S.qcKeys){
+    const q = S.qc[k.key]; if(!q.on) continue;
+    const x = S.cols[k.key][i];
+    if(!(x >= q.lo && x <= q.hi)) return false;
+  }
+  return true;
+}
+const qcActive = () => S.qcKeys.some(k => S.qc[k.key].on);
+
+/* ---------- compute ----------------------------------------
+   One pass builds, per well, a histogram over marker BITMASKS
+   (bit m set = positive for marker m). Everything downstream -
+   population classes, marker totals, combinations, and every
+   biaxial quadrant - is then an O(2^k) sum over that histogram
+   instead of another O(n) pass over the cells. With <=5 markers
+   that is 32 bins, so dragging a gate stays interactive on a
+   quarter-million nuclei.
+   ------------------------------------------------------------ */
+const POPCOUNT = (() => { const a = new Uint8Array(65536);
+  for(let i=1;i<65536;i++) a[i] = a[i>>1] + (i&1); return a; })();
+
+function recompute(){
+  const on = S.markers.filter(m => S.markerOn.has(m));
+  const K = on.length;
+  let n = 0;
+  for(const k of S.wellOn) n += S.wellIdx.get(k).length;
+  const pre = new Int32Array(n);
+  let p = 0;
+  for(const k of S.wells){ if(!S.wellOn.has(k)) continue;
+    const a = S.wellIdx.get(k); pre.set(a, p); p += a.length; }
+  S.preActive = pre;                       // wells only - what the QC plots show
+
+  // the cell filter narrows the set everything else works on
+  let act = pre, keep = null;
+  if(qcActive()){
+    keep = new Uint8Array(S.rows);
+    let m = 0;
+    for(let j=0;j<pre.length;j++){ const i = pre[j];
+      if(qcPass(i)){ keep[i] = 1; m++; } }
+    act = new Int32Array(m); let q = 0;
+    for(let j=0;j<pre.length;j++){ const i = pre[j]; if(keep[i]) act[q++] = i; }
+  }
+  S.active = act; S.qcKeep = keep;
+  S.markersOn = on; S.nMarkersOn = K;
+
+  const cols = on.map(m => S.cols[`${S.stat}_${m}`]);
+  const thr  = on.map(m => S.thr[m]);
+  const NBIN = 1 << K;
+  const mask = S.maskOf && S.maskOf.length === S.rows ? S.maskOf : (S.maskOf = new Uint32Array(S.rows));
+
+  const rows = [];
+  const keepMask = S.qcKeep;
+  for(const k of S.wells){
+    const a0 = S.wellIdx.get(k);
+    const a = keepMask ? a0.filter(i => keepMask[i]) : a0;
+    const hist = new Uint32Array(NBIN);
+    for(let j=0;j<a.length;j++){
+      const i = a[j]; let mk = 0;
+      for(let m=0;m<K;m++) if(cols[m][i] > thr[m]) mk |= (1<<m);
+      mask[i] = mk; hist[mk]++;
+    }
+    const counts = new Array(K+1).fill(0);
+    const posN = new Array(K).fill(0);
+    for(let b=0;b<NBIN;b++){
+      const c = hist[b]; if(!c) continue;
+      counts[POPCOUNT[b]] += c;
+      for(let m=0;m<K;m++) if(b & (1<<m)) posN[m] += c;
+    }
+    rows.push({ well:k, on:S.wellOn.has(k), n:a.length, nRaw:a0.length,
+                counts, posN, hist });
+  }
+  S.perWell = rows;
+
+  // pooled bitmask histogram over the INCLUDED wells - the source for
+  // quadrant statistics and the combination breakdown
+  const pooled = new Uint32Array(NBIN);
+  for(const r of rows) if(r.on) for(let b=0;b<NBIN;b++) pooled[b] += r.hist[b];
+  S.pooledHist = pooled;
+  S.cloudKey = [S.plate, S.stat, [...S.wellOn].sort().join(","), on.join(","),
+    S.qcKeys.map(k=>{const q=S.qc[k.key];
+      return q.on ? `${k.key}:${q.lo}:${q.hi}` : "";}).join(";")].join("|");
+}
+
+/** Quadrant counts for a marker pair, straight from the bitmask histogram. */
+function quadrants(mx, my){
+  const on = S.markersOn, h = S.pooledHist;
+  const a = on.indexOf(mx), b = on.indexOf(my);
+  if(a < 0 || b < 0 || !h) return { ur:0, ul:0, ll:0, lr:0, n:0 };
+  const A = 1<<a, B = 1<<b;
+  let ur=0, ul=0, ll=0, lr=0, n=0;
+  for(let k=0;k<h.length;k++){
+    const c = h[k]; if(!c) continue;
+    n += c;
+    if(k & A){ (k & B) ? ur += c : lr += c; }
+    else     { (k & B) ? ul += c : ll += c; }
+  }
+  return { ur, ul, ll, lr, n };
+}
+
+/* ---------- rendering: plate map (the signature) ----------- */
+function metricValue(r){
+  const m = S.metric;
+  if(m === "n_cells") return r.n;
+  if(!r.n) return NaN;
+  if(m.startsWith("pct_pop_")){
+    const k = +m.slice(8); return 100*(r.counts[k]||0)/r.n;
+  }
+  if(m.startsWith("pct_mark_")){
+    const k = +m.slice(9); return 100*(r.posN[k]||0)/r.n;
+  }
+  if(m === "pct_any") return 100*(r.n - (r.counts[0]||0))/r.n;
+  return NaN;
+}
+function ramp(t){ // perceptual-ish dark→cyan→green→yellow, distinct from the fluorophores
+  t = Math.max(0, Math.min(1, t));
+  const stops = [[30,42,58],[26,84,108],[34,142,128],[86,198,116],[244,220,88]];
+  const x = t*(stops.length-1), i = Math.min(stops.length-2, Math.floor(x)), f = x-i;
+  const a = stops[i], b = stops[i+1];
+  return `rgb(${Math.round(a[0]+(b[0]-a[0])*f)},${Math.round(a[1]+(b[1]-a[1])*f)},${Math.round(a[2]+(b[2]-a[2])*f)})`;
+}
+
+function drawPlate(){
+  if(!S.perWell) return;
+  const rcs = S.wells.map(wellRC);
+  const grid = rcs.every(Boolean);
+  // 96-well plates get generous squares; 384 and 1536 shrink so the whole
+  // plate still reads as one shape without scrolling.
+  const nCol = grid ? Math.max(...rcs.map(r=>r.col)) + 1 : 12;
+  const wsz = nCol <= 12 ? 22 : nCol <= 16 ? 17 : nCol <= 24 ? 11 : 8;
+  document.documentElement.style.setProperty("--wsz", wsz+"px");
+  document.getElementById("plate").style.borderSpacing = (wsz >= 17 ? 3 : 2)+"px";
+  const t = document.getElementById("plate");
+  const vals = S.perWell.map(metricValue).filter(v => isFinite(v));
+  const lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1;
+  document.getElementById("rampLo").textContent = fmt(lo);
+  document.getElementById("rampHi").textContent = fmt(hi);
+  document.getElementById("ramp").style.background =
+    `linear-gradient(90deg,${ramp(0)},${ramp(.25)},${ramp(.5)},${ramp(.75)},${ramp(1)})`;
+
+  const byKey = new Map(S.perWell.map(r => [r.well, r]));
+  let html = "";
+  if(grid){
+    const maxR = Math.max(...rcs.map(r=>r.row)), maxC = Math.max(...rcs.map(r=>r.col));
+    const at = new Map();
+    S.wells.forEach((k,i)=> at.set(rcs[i].row+":"+rcs[i].col, k));
+    html += "<tr><th></th>";
+    for(let c=0;c<=maxC;c++) html += `<th>${c+1}</th>`;
+    html += "</tr>";
+    for(let r=0;r<=maxR;r++){
+      html += `<tr><th>${String.fromCharCode(65+r)}</th>`;
+      for(let c=0;c<=maxC;c++){
+        const k = at.get(r+":"+c);
+        if(!k){ html += `<td><div class="well empty"></div></td>`; continue; }
+        html += `<td>${wellCell(k, byKey.get(k), lo, hi)}</td>`;
+      }
+      html += "</tr>";
+    }
+  } else {
+    html += "<tr>";
+    S.wells.forEach((k,i)=>{
+      if(i && i%12===0) html += "</tr><tr>";
+      html += `<td>${wellCell(k, byKey.get(k), lo, hi)}</td>`;
+    });
+    html += "</tr>";
+  }
+  t.innerHTML = html;
+  t.querySelectorAll(".well[data-w]").forEach(el=>{
+    el.onclick = () => { const k = el.dataset.w;
+      S.wellOn.has(k) ? S.wellOn.delete(k) : S.wellOn.add(k); refresh(); };
+  });
+}
+function wellCell(k, r, lo, hi){
+  const v = r ? metricValue(r) : NaN;
+  const t = (hi > lo && isFinite(v)) ? (v-lo)/(hi-lo) : 0;
+  const bg = isFinite(v) ? ramp(t) : "var(--off)";
+  const off = r && !r.on;
+  return `<div class="well${off?" excluded":""}" data-w="${k}"
+    style="background:${bg}" title="${k} — ${r?r.n:0} cells, ${metricLabel()} ${fmt(v)}${off?" (excluded)":""}"></div>`;
+}
+const fmt = v => !isFinite(v) ? "–" : Math.abs(v) >= 1000 ? Math.round(v).toLocaleString()
+              : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
+
+/* ---------- rendering: gates ------------------------------- */
+function buildGates(){
+  const box = document.getElementById("gates");
+  box.innerHTML = "";
+  for(const m of S.markers){
+    if(!S.markerOn.has(m)) continue;
+    const d = document.createElement("div"); d.className = "gate";
+    d.innerHTML = `
+      <div class="gate-h">
+        <span class="dot" style="background:${markerColor(m)}"></span>
+        <span class="nm">${m}</span>
+        <span class="pc" data-pc="${m}">—</span>
+        <input class="val" data-val="${m}" value="">
+        <button class="rst" data-rst="${m}" title="back to the automatic threshold">auto</button>
+      </div>
+      <div class="histWrap" data-h="${m}"><canvas></canvas></div>`;
+    box.appendChild(d);
+  }
+  box.querySelectorAll("[data-val]").forEach(inp=>{
+    inp.onchange = () => { const v = Number(inp.value.replace(/,/g,""));
+      if(isFinite(v)){ S.thr[inp.dataset.val] = v;
+        (S.thrManual = S.thrManual || {})[inp.dataset.val] = true; refresh(); } };
+  });
+  box.querySelectorAll("[data-rst]").forEach(b=>{
+    b.onclick = () => { S.thr[b.dataset.rst] = S.autoThr[b.dataset.rst];
+      if(S.thrManual) delete S.thrManual[b.dataset.rst]; refresh(); };
+  });
+  box.querySelectorAll("[data-h]").forEach(w => attachDrag(w, w.dataset.h));
+}
+function markerColor(m){
+  const i = S.markers.indexOf(m);
+  return css(CH_COLORS[i % CH_COLORS.length]);
+}
+function attachDrag(wrap, m){
+  const set = ev => {
+    const r = wrap.getBoundingClientRect();
+    const x = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left)/r.width;
+    const g = wrap._g; if(!g) return;
+    const a = g.lo + (g.hi - g.lo)*Math.max(0, Math.min(1, x));
+    S.thr[m] = g.cf*Math.sinh(a);
+    (S.thrManual = S.thrManual || {})[m] = true;
+    refresh(true);
+  };
+  const up = () => { document.removeEventListener("pointermove", set);
+                     document.removeEventListener("pointerup", up); refresh(); };
+  wrap.addEventListener("pointerdown", e => { e.preventDefault(); set(e);
+    document.addEventListener("pointermove", set); document.addEventListener("pointerup", up); });
+}
+
+function drawHist(m, overlayOnly){
+  const wrap = document.querySelector(`[data-h="${CSS.escape(m)}"]`);
+  if(!wrap) return;
+  const cv = wrap.querySelector("canvas");
+  const W = wrap.clientWidth, H = wrap.clientHeight, dpr = devicePixelRatio || 1;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+
+  // Bin counts depend on the cells, not the gate. Cache them so dragging
+  // only recolours the bars either side of the threshold.
+  const key = S.cloudKey + "|" + m + "|" + W;
+  let cache = wrap._bins;
+  if(!cache || cache.key !== key || !overlayOnly){
+    const vals = S.cols[`${S.stat}_${m}`], act = S.active || new Int32Array(0);
+    const cf = cofactor(vals, act);
+    let lo = Infinity, hi = -Infinity;
+    const step = Math.max(1, Math.floor(act.length/50000));
+    for(let i=0;i<act.length;i+=step){ const a = asinh(vals[act[i]], cf);
+      if(!isFinite(a)) continue; if(a<lo)lo=a; if(a>hi)hi=a; }
+    if(!(hi>lo)){ lo = 0; hi = 1; }
+    lo = Math.min(lo, 0); hi += (hi-lo)*0.04;
+    const NB = Math.max(60, Math.floor(W/2));
+    const hist = new Float64Array(NB);
+    for(let j=0;j<act.length;j++){
+      const a = asinh(vals[act[j]], cf);
+      if(!isFinite(a)) continue;
+      const b = Math.floor((a-lo)/(hi-lo)*NB);
+      if(b>=0 && b<NB) hist[b]++;
+    }
+    let mx = 0; for(const v of hist) if(v>mx) mx = v;
+    cache = { key, lo, hi, cf, hist, NB, mx: mx||1 };
+    wrap._bins = cache;
+  }
+  const { lo, hi, cf, hist, NB, mx } = cache;
+  wrap._g = { lo, hi, cf };
+
+  const thrA = asinh(S.thr[m], cf);
+  const col = markerColor(m);
+  const bw = W/NB;
+  for(let b=0;b<NB;b++){
+    const h = (hist[b]/mx)*(H-12);
+    const x = b*bw, a = lo + (b+0.5)/NB*(hi-lo);
+    g.fillStyle = a > thrA ? col : "#4E678C";
+    g.fillRect(x, H-h-1, Math.max(bw-0.4, 0.6), h);
+  }
+  // gate line
+  const gx = (thrA-lo)/(hi-lo)*W;
+  g.strokeStyle = css("--gate"); g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(gx, 0); g.lineTo(gx, H); g.stroke();
+  g.fillStyle = css("--gate");
+  g.beginPath(); g.moveTo(gx-4, 0); g.lineTo(gx+4, 0); g.lineTo(gx, 6); g.fill();
+  // decade ticks
+  g.strokeStyle = "#324660"; g.lineWidth = 1; g.font = "9px "+css("--mono");
+  g.fillStyle = css("--faint");
+  for(let d=0;d<=7;d++){
+    const v = d === 0 ? 0 : Math.pow(10,d);
+    const a = asinh(v, cf); if(a < lo || a > hi) continue;
+    const x = (a-lo)/(hi-lo)*W;
+    g.beginPath(); g.moveTo(x, H-5); g.lineTo(x, H); g.stroke();
+    g.fillText(d === 0 ? "0" : "1e"+d, x+2, H-6);
+  }
+}
+
+/* ---------- rendering: QC range gates ---------------------- */
+function buildQC(){
+  const box = document.getElementById("qcGrid");
+  box.innerHTML = S.qcKeys.map(k=>`
+    <div class="qc off" data-qc="${k.key}">
+      <div class="qc-h"><span class="nm">${k.label}</span>
+        <span class="kind">${k.kind}</span><span class="sw"></span></div>
+      <div class="rangeWrap"><canvas></canvas></div>
+      <div class="lims">
+        <input data-lo="${k.key}" disabled><input data-hi="${k.key}" disabled>
+      </div>
+    </div>`).join("");
+  box.querySelectorAll("[data-qc]").forEach(el=>{
+    const key = el.dataset.qc;
+    el.querySelector(".sw").onclick = () => {
+      const q = S.qc[key]; q.on = !q.on;
+      if(q.on && q.lo === q.min && q.hi === q.max){
+        const w = autoWindow(key); if(w){ q.lo = w[0]; q.hi = w[1]; }
+      }
+      syncQC(); refresh();
+    };
+    attachRange(el.querySelector(".rangeWrap"), key);
+  });
+  box.querySelectorAll("[data-lo],[data-hi]").forEach(inp=>{
+    inp.onchange = () => {
+      const key = inp.dataset.lo || inp.dataset.hi;
+      const v = Number(inp.value.replace(/,/g,""));
+      if(!isFinite(v)) return;
+      const q = S.qc[key];
+      if(inp.dataset.lo) q.lo = Math.min(v, q.hi); else q.hi = Math.max(v, q.lo);
+      refresh();
+    };
+  });
+  buildMorphPickers();
+}
+function syncQC(){
+  for(const k of S.qcKeys){
+    const el = document.querySelector(`[data-qc="${CSS.escape(k.key)}"]`);
+    if(!el) continue;
+    const q = S.qc[k.key];
+    el.classList.toggle("on", q.on); el.classList.toggle("off", !q.on);
+    const lo = el.querySelector("[data-lo]"), hi = el.querySelector("[data-hi]");
+    lo.disabled = hi.disabled = !q.on;
+    if(document.activeElement !== lo) lo.value = fmtThr(q.lo);
+    if(document.activeElement !== hi) hi.value = fmtThr(q.hi);
+  }
+}
+function attachRange(wrap, key){
+  let grab = null;
+  const posOf = ev => {
+    const r = wrap.getBoundingClientRect();
+    return ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left)/r.width;
+  };
+  const move = ev => {
+    const g = wrap._g; if(!g) return;
+    const a = g.lo + (g.hi-g.lo)*Math.max(0, Math.min(1, posOf(ev)));
+    const v = g.inv(a), q = S.qc[key];
+    if(grab === "lo") q.lo = Math.min(v, q.hi); else q.hi = Math.max(v, q.lo);
+    refresh(true);
+  };
+  const up = () => { grab = null;
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up); refresh(); };
+  wrap.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    const q = S.qc[key]; if(!q.on){ q.on = true;
+      const w = autoWindow(key); if(w && q.lo===q.min && q.hi===q.max){ q.lo=w[0]; q.hi=w[1]; }
+      syncQC(); }
+    const g = wrap._g; if(!g) return;
+    const x = g.lo + (g.hi-g.lo)*posOf(e);
+    grab = Math.abs(x - g.fwd(q.lo)) <= Math.abs(x - g.fwd(q.hi)) ? "lo" : "hi";
+    move(e);
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  });
+}
+function drawRange(k, overlayOnly){
+  const el = document.querySelector(`[data-qc="${CSS.escape(k.key)}"]`);
+  if(!el) return;
+  const wrap = el.querySelector(".rangeWrap"), cv = wrap.querySelector("canvas");
+  const W = wrap.clientWidth, H = wrap.clientHeight, dpr = devicePixelRatio||1;
+  if(!W) return;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+
+  const vals = S.cols[k.key], src = S.preActive || S.active;
+  // QC histograms show every cell in the selected wells, NOT the filtered set -
+  // otherwise the distribution would shift as you drag its own window.
+  const key = [S.plate, [...S.wellOn].sort().join(","), S.stat, k.key, W].join("|");
+  let cache = wrap._bins;
+  if(!cache || cache.key !== key){
+    let cf = 1, fwd, inv;
+    if(k.log){ cf = cofactor(vals, src); fwd = x => asinh(x, cf); inv = a => cf*Math.sinh(a); }
+    else { fwd = x => x; inv = a => a; }
+    let lo = Infinity, hi = -Infinity;
+    const st = Math.max(1, Math.floor(src.length/40000));
+    for(let i=0;i<src.length;i+=st){ const a = fwd(vals[src[i]]);
+      if(!isFinite(a)) continue; if(a<lo)lo=a; if(a>hi)hi=a; }
+    if(!(hi>lo)){ lo = 0; hi = 1; }
+    const padA = (hi-lo)*0.03; lo -= padA; hi += padA;
+    const NB = Math.max(48, Math.floor(W/2.4));
+    const hist = new Float64Array(NB);
+    for(let j=0;j<src.length;j++){ const a = fwd(vals[src[j]]);
+      if(!isFinite(a)) continue;
+      const b = Math.floor((a-lo)/(hi-lo)*NB); if(b>=0&&b<NB) hist[b]++; }
+    let mx = 0; for(const v of hist) if(v>mx) mx = v;
+    cache = { key, lo, hi, fwd, inv, hist, NB, mx: mx||1 };
+    wrap._bins = cache;
+  }
+  const { lo, hi, fwd, inv, hist, NB, mx } = cache;
+  wrap._g = { lo, hi, fwd, inv };
+
+  const q = S.qc[k.key];
+  const xLo = (fwd(q.lo)-lo)/(hi-lo)*W, xHi = (fwd(q.hi)-lo)/(hi-lo)*W;
+  const bw = W/NB;
+  for(let b=0;b<NB;b++){
+    const h = (hist[b]/mx)*(H-9), x = b*bw;
+    const inside = !q.on || (x+bw/2 >= xLo && x+bw/2 <= xHi);
+    g.fillStyle = inside ? (k.log ? css("--c405") : "#7B96B0") : "#3A4A6088";
+    g.fillRect(x, H-h-1, Math.max(bw-0.4,0.6), h);
+  }
+  if(q.on){
+    g.fillStyle = "rgba(11,16,23,.55)";
+    g.fillRect(0,0,Math.max(0,xLo),H); g.fillRect(xHi,0,Math.max(0,W-xHi),H);
+    g.strokeStyle = css("--c405"); g.lineWidth = 1.5;
+    for(const x of [xLo,xHi]){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke(); }
+    g.fillStyle = css("--c405");
+    for(const x of [xLo,xHi]) g.fillRect(x-2.5, 0, 5, 4);
+  }
+}
+
+/* ---------- rendering: morphology vs intensity ------------- */
+function buildMorphPickers(){
+  const xs = S.qcKeys.map(k => [k.key, k.label]);
+  const ys = [];
+  if(S.dapi) ys.push([`${S.stat}_${S.dapi}`, S.dapi]);
+  for(const m of S.markers) ys.push([`${S.stat}_${m}`, m]);
+  for(const k of S.qcKeys) if(!k.log) ys.push([k.key, k.label]);
+  const X = document.getElementById("mX"), Y = document.getElementById("mY");
+  X.innerHTML = xs.map(([v,l])=>`<option value="${v}">${l}</option>`).join("");
+  Y.innerHTML = ys.map(([v,l])=>`<option value="${v}">${l}</option>`).join("");
+  S.mX = xs.length ? (xs.find(o=>o[0]==="area") ? "area" : xs[0][0]) : null;
+  S.mY = ys.length > 1 ? ys[1][0] : (ys[0] ? ys[0][0] : null);
+  X.value = S.mX; Y.value = S.mY;
+  X.onchange = () => { S.mX = X.value; drawMorph(); };
+  Y.onchange = () => { S.mY = Y.value; drawMorph(); };
+}
+function drawMorph(){
+  const cv = document.getElementById("cMorph");
+  if(!cv || !S.mX || !S.mY) return;
+  const W = cv.parentElement.clientWidth, H = Math.round(W*0.72), dpr = devicePixelRatio||1;
+  cv.width = W*dpr; cv.height = H*dpr; cv.style.height = H+"px";
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle = "#101823"; g.fillRect(0,0,W,H);
+
+  const src = S.preActive || S.active;
+  if(!src || !src.length){ note(g,W,H,"no cells"); return; }
+  const vx = S.cols[S.mX], vy = S.cols[S.mY];
+  const kx = S.qcKeys.find(k=>k.key===S.mX);
+  const logX = kx ? kx.log : /^(mean|median|integrated)_/.test(S.mX);
+  const logY = /^(mean|median|integrated)_/.test(S.mY);
+  const cfx = logX ? cofactor(vx,src) : 1, cfy = logY ? cofactor(vy,src) : 1;
+  const fx = x => logX ? asinh(x,cfx) : x, fy = y => logY ? asinh(y,cfy) : y;
+  const pad = W < 300 ? 25 : 30, fs = W < 300 ? 8 : 9;
+  const rng = f => { let lo=Infinity,hi=-Infinity;
+    const st = Math.max(1,Math.floor(src.length/30000));
+    for(let i=0;i<src.length;i+=st){ const a=f(i); if(!isFinite(a))continue;
+      if(a<lo)lo=a; if(a>hi)hi=a; }
+    if(!(hi>lo)){lo=0;hi=1;} const p=(hi-lo)*0.04; return [lo-p,hi+p]; };
+  const [xlo,xhi] = rng(i=>fx(vx[src[i]])), [ylo,yhi] = rng(i=>fy(vy[src[i]]));
+  const X = a => pad + (a-xlo)/(xhi-xlo)*(W-pad-8);
+  const Y = a => H-pad - (a-ylo)/(yhi-ylo)*(H-pad-10);
+
+  // pass band for the x axis, if that axis is being filtered
+  const qx = S.qc[S.mX];
+  if(qx && qx.on){
+    g.fillStyle = "rgba(91,143,249,.10)";
+    g.fillRect(X(fx(qx.lo)), 0, X(fx(qx.hi))-X(fx(qx.lo)), H-pad);
+    g.strokeStyle = css("--c405"); g.lineWidth = 1; g.setLineDash([4,3]);
+    for(const v of [qx.lo,qx.hi]){ const x=X(fx(v));
+      g.beginPath(); g.moveTo(x,0); g.lineTo(x,H-pad); g.stroke(); }
+    g.setLineDash([]);
+  }
+
+  // cells: kept in colour, filtered-out in grey, so you see what you're losing
+  const keep = S.qcKeep;
+  const st = Math.max(1, Math.floor(src.length/45000));
+  const NB = 100, dens = new Float32Array(NB*NB);
+  const ax = [], ay = [], ok = [];
+  for(let i=0;i<src.length;i+=st){
+    const k = src[i], a = fx(vx[k]), b = fy(vy[k]);
+    if(!isFinite(a)||!isFinite(b)) continue;
+    ax.push(a); ay.push(b); ok.push(!keep || keep[k]);
+    const ix = Math.min(NB-1,Math.max(0,Math.floor((a-xlo)/(xhi-xlo)*NB)));
+    const iy = Math.min(NB-1,Math.max(0,Math.floor((b-ylo)/(yhi-ylo)*NB)));
+    dens[iy*NB+ix]++;
+  }
+  let dmax = 0; for(const v of dens) if(v>dmax) dmax = v;
+  if(!dmax) dmax = 1;
+  for(let i=0;i<ax.length;i++){
+    const ix = Math.min(NB-1,Math.max(0,Math.floor((ax[i]-xlo)/(xhi-xlo)*NB)));
+    const iy = Math.min(NB-1,Math.max(0,Math.floor((ay[i]-ylo)/(yhi-ylo)*NB)));
+    g.fillStyle = ok[i] ? ramp(Math.pow(dens[iy*NB+ix]/dmax,0.42)) : "#445A75";
+    g.fillRect(X(ax[i]), Y(ay[i]), 1.5, 1.5);
+  }
+
+  g.strokeStyle = css("--line"); g.beginPath();
+  g.moveTo(pad,H-pad); g.lineTo(W-8,H-pad); g.moveTo(pad,4); g.lineTo(pad,H-pad); g.stroke();
+  g.fillStyle = css("--faint"); g.font = fs+"px "+css("--mono");
+  const nT = W < 300 ? 3 : 4;
+  const ticks = (lo,hi,log,cf) => {
+    const out = [];
+    if(log){ for(let d=0;d<=7;d++){ const v=d===0?0:Math.pow(10,d), a=asinh(v,cf);
+        if(a>=lo&&a<=hi) out.push([a, d===0?"0":"1e"+d]); } }
+    else { for(let i=0;i<=nT;i++){ const a=lo+(hi-lo)*i/nT;
+        out.push([a, Math.abs(a)>=100?a.toFixed(0):a.toFixed(2)]); } }
+    return out; };
+  for(const [a,l] of ticks(xlo,xhi,logX,cfx)){ const x=X(a);
+    g.beginPath(); g.moveTo(x,H-pad); g.lineTo(x,H-pad+3); g.stroke();
+    g.textAlign="center"; g.fillText(l, x, H-pad+13); }
+  for(const [a,l] of ticks(ylo,yhi,logY,cfy)){ const y=Y(a);
+    g.beginPath(); g.moveTo(pad-3,y); g.lineTo(pad,y); g.stroke();
+    g.save(); g.translate(pad-6,y); g.rotate(-Math.PI/2);
+    g.textAlign="center"; g.fillText(l,0,0); g.restore(); }
+  const lx = document.getElementById("mX"), ly = document.getElementById("mY");
+  g.font = (fs+1)+"px "+css("--mono"); g.textAlign="center"; g.fillStyle = css("--dim");
+  g.fillText(lx.options[lx.selectedIndex].text, pad+(W-pad-8)/2, H-3);
+  g.save(); g.translate(9, pad+(H-pad-10)/2); g.rotate(-Math.PI/2);
+  g.fillText(ly.options[ly.selectedIndex].text, 0, 0); g.restore();
+  g.textAlign="left";
+}
+
+/* ---------- rendering: population bars --------------------- */
+function drawBars(id, mode){
+  const cv = document.getElementById(id);
+  if(!cv || !S.perWell) return;
+  const W = cv.parentElement.clientWidth, H = 190, dpr = devicePixelRatio||1;
+  cv.width = W*dpr; cv.height = H*dpr; cv.style.height = H+"px";
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+
+  const rows = S.perWell.filter(r => r.on && r.n);
+  if(!rows.length){ note(g,W,H,"no wells selected"); return; }
+  const pad = 22, bw = Math.max(1, (W-pad-4)/rows.length);
+  const maxN = Math.max(...rows.map(r => r.n));
+  const K = S.nMarkersOn+1;
+
+  rows.forEach((r,i)=>{
+    const x = pad + i*bw;
+    const total = mode === "pct" ? r.n : maxN;
+    let y = H-16;
+    for(let k=0;k<K;k++){
+      const frac = (r.counts[k]||0)/(total||1);
+      const h = frac*(H-30);
+      g.fillStyle = POP_COLORS[Math.min(k, POP_COLORS.length-1)];
+      g.fillRect(x, y-h, Math.max(bw-0.6,0.8), h);
+      y -= h;
+    }
+  });
+  // axis
+  g.strokeStyle = css("--line"); g.beginPath();
+  g.moveTo(pad-2, H-16); g.lineTo(W-2, H-16); g.stroke();
+  g.fillStyle = css("--faint"); g.font = "9px "+css("--mono");
+  g.fillText(mode === "pct" ? "100%" : fmt(maxN), 1, 12);
+  g.fillText("0", 1, H-18);
+  if(rows.length <= 26){
+    g.save(); g.textAlign = "right";
+    rows.forEach((r,i)=>{ g.fillText(r.well, pad+i*bw+bw*0.5+8, H-5); });
+    g.restore();
+  } else g.fillText(rows.length+" wells", pad, H-4);
+}
+function note(g,W,H,msg){
+  g.fillStyle = css("--faint"); g.font = "11px "+css("--mono");
+  g.textAlign = "center"; g.fillText(msg, W/2, H/2); g.textAlign = "left";
+}
+
+/* ---------- rendering: biaxial ----------------------------- */
+function buildBiaxial(){
+  const on = S.markers.filter(m => S.markerOn.has(m));
+  const grid = document.getElementById("biGrid");
+  const pairs = [];
+  for(let i=0;i<on.length;i++) for(let j=i+1;j<on.length;j++) pairs.push([on[i],on[j]]);
+  document.getElementById("biNote").textContent =
+    pairs.length ? `${pairs.length} pair${pairs.length>1?"s":""} · quadrant % of selected cells`
+                 : "switch on two markers to see a biaxial plot";
+  grid.innerHTML = pairs.map(([a,b]) =>
+    `<div class="plot"><canvas data-bi="${a}|${b}"></canvas>
+       <div class="cap">${a} × ${b}</div></div>`).join("");
+  pairs.forEach(p => drawBiaxial(p[0], p[1]));
+}
+function drawBiaxial(mx, my, overlayOnly){
+  const cv = document.querySelector(`[data-bi="${CSS.escape(mx+"|"+my)}"]`);
+  if(!cv) return;
+  const W = cv.parentElement.clientWidth, H = Math.round(W*(W<210?0.98:0.88)), dpr = devicePixelRatio||1;
+  if(cv.width !== Math.round(W*dpr)){ cv.width = W*dpr; cv.height = H*dpr;
+    cv.style.height = H+"px"; overlayOnly = false; }
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+
+  // The density cloud depends on the cells, not the gates. Cache it and,
+  // while a gate is being dragged, repaint only the crosshair and the
+  // quadrant percentages on top.
+  const key = S.cloudKey + "|" + W;
+  let c = cv._cloud;
+  if(!c || c.key !== key || !overlayOnly){
+    c = buildCloud(cv, mx, my, W, H, dpr);
+    if(!c) { note(g,W,H,"no cells"); return; }
+    c.key = key; cv._cloud = c;
+  }
+  g.clearRect(0,0,W,H);
+  g.drawImage(c.canvas, 0, 0, W, H);
+  drawBiaxialOverlay(g, c, mx, my, W, H);
+}
+
+function buildCloud(cv, mx, my, W, H, dpr){
+  const vx = S.cols[`${S.stat}_${mx}`], vy = S.cols[`${S.stat}_${my}`], act = S.active;
+  if(!act || !act.length) return null;
+  const off = document.createElement("canvas");
+  off.width = W*dpr; off.height = H*dpr;
+  const g = off.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle = "#101823"; g.fillRect(0,0,W,H);
+
+  const cfx = cofactor(vx,act), cfy = cofactor(vy,act);
+  // Small multiples: shrink the furniture so the data keeps the space.
+  const sm = W < 210;
+  const pad = sm ? 17 : 26, fs = sm ? 8 : 9, dot = sm ? 1.2 : 1.5;
+  const rng = (v,cf) => { let lo=Infinity,hi=-Infinity;
+    const st = Math.max(1,Math.floor(act.length/40000));
+    for(let i=0;i<act.length;i+=st){ const a = asinh(v[act[i]],cf);
+      if(!isFinite(a))continue; if(a<lo)lo=a; if(a>hi)hi=a; }
+    if(!(hi>lo)){lo=0;hi=1;} return [Math.min(lo,0), hi+(hi-lo)*0.05]; };
+  const [xlo,xhi] = rng(vx,cfx), [ylo,yhi] = rng(vy,cfy);
+  const X = a => pad + (a-xlo)/(xhi-xlo)*(W-pad-6);
+  const Y = a => H-pad - (a-ylo)/(yhi-ylo)*(H-pad-8);
+
+  const NB = 110, dens = new Float32Array(NB*NB);
+  const st = Math.max(1, Math.floor(act.length/60000));
+  const n = Math.ceil(act.length/st);
+  const bx = new Float32Array(n), by = new Float32Array(n);
+  let m = 0;
+  for(let i=0;i<act.length;i+=st){
+    const k = act[i];
+    const ax = asinh(vx[k],cfx), ay = asinh(vy[k],cfy);
+    if(!isFinite(ax)||!isFinite(ay)) continue;
+    const ix = Math.min(NB-1,Math.max(0,Math.floor((ax-xlo)/(xhi-xlo)*NB)));
+    const iy = Math.min(NB-1,Math.max(0,Math.floor((ay-ylo)/(yhi-ylo)*NB)));
+    dens[iy*NB+ix]++; bx[m]=ax; by[m]=ay; m++;
+  }
+  let dmax = 0; for(const v of dens) if(v>dmax) dmax = v;
+  if(!dmax) dmax = 1;
+  for(let i=0;i<m;i++){
+    const ix = Math.min(NB-1,Math.max(0,Math.floor((bx[i]-xlo)/(xhi-xlo)*NB)));
+    const iy = Math.min(NB-1,Math.max(0,Math.floor((by[i]-ylo)/(yhi-ylo)*NB)));
+    g.fillStyle = ramp(Math.pow(dens[iy*NB+ix]/dmax,0.42));
+    g.fillRect(X(bx[i]), Y(by[i]), dot, dot);
+  }
+  // static axes belong to the cached layer
+  g.strokeStyle = css("--line"); g.beginPath();
+  g.moveTo(pad,H-pad); g.lineTo(W-6,H-pad); g.moveTo(pad,4); g.lineTo(pad,H-pad); g.stroke();
+  g.fillStyle = css("--faint"); g.font = fs+"px "+css("--mono");
+  for(let d=0;d<=7;d++){
+    if(sm && d%2===1) continue;            // every other decade when cramped
+    const v = d===0?0:Math.pow(10,d);
+    const ax = asinh(v,cfx), ay = asinh(v,cfy);
+    const lbl = d===0?"0":"1e"+d;
+    if(ax>=xlo&&ax<=xhi){ const x=X(ax); g.beginPath(); g.moveTo(x,H-pad); g.lineTo(x,H-pad+3); g.stroke();
+      g.fillText(lbl, x-(sm?5:6), H-pad+(sm?10:13)); }
+    if(ay>=ylo&&ay<=yhi){ const y=Y(ay); g.beginPath(); g.moveTo(pad-3,y); g.lineTo(pad,y); g.stroke();
+      g.save(); g.translate(pad-(sm?4:6),y); g.rotate(-Math.PI/2); g.textAlign="center";
+      g.fillText(lbl,0,0); g.restore(); }
+  }
+  // Axis names go at the CENTRE of each axis: the four corners belong to the
+  // quadrant percentages, and the two collided at small sizes.
+  g.font = (sm?9:10)+"px "+css("--mono"); g.textAlign = "center";
+  g.fillStyle = markerColor(mx);
+  g.fillText(mx, pad + (W-pad-6)/2, H-3);
+  g.fillStyle = markerColor(my);
+  g.save(); g.translate(sm?8:9, pad + (H-pad-8)/2); g.rotate(-Math.PI/2);
+  g.fillText(my, 0, 0); g.restore();
+  g.textAlign = "left";
+  return { canvas:off, cfx, cfy, xlo, xhi, ylo, yhi, pad, sm };
+}
+
+function drawBiaxialOverlay(g, c, mx, my, W, H){
+  const X = a => c.pad + (a-c.xlo)/(c.xhi-c.xlo)*(W-c.pad-6);
+  const Y = a => H-c.pad - (a-c.ylo)/(c.yhi-c.ylo)*(H-c.pad-8);
+  const gx = X(asinh(S.thr[mx],c.cfx)), gy = Y(asinh(S.thr[my],c.cfy));
+  g.strokeStyle = css("--gate"); g.lineWidth = 1; g.setLineDash([4,3]);
+  g.beginPath(); g.moveTo(gx,0); g.lineTo(gx,H-c.pad);
+  g.moveTo(c.pad,gy); g.lineTo(W-6,gy); g.stroke();
+  g.setLineDash([]);
+
+  const q = quadrants(mx,my), N = q.n || 1;
+  g.font = (c.sm ? 8.5 : 10)+"px "+css("--mono");
+  const lab = (t,x,y,ax,ay)=>{
+    g.textAlign=ax; g.textBaseline=ay;
+    const w = g.measureText(t).width;
+    g.fillStyle = "rgba(11,16,23,.72)";
+    g.fillRect(ax==="right"?x-w-3:x-3, ay==="top"?y-2:y-12, w+6, 14);
+    g.fillStyle = css("--ink"); g.fillText(t,x,y);
+  };
+  const d1 = c.sm ? 0 : 1;                 // fewer digits on the small plots
+  const pc = v => (100*v/N).toFixed(d1)+"%";
+  lab(pc(q.ur), W-7, 4, "right","top");
+  lab(pc(q.ul), c.pad+3, 4, "left","top");
+  lab(pc(q.ll), c.pad+3, H-c.pad-3, "left","bottom");
+  lab(pc(q.lr), W-7, H-c.pad-3, "right","bottom");
+  g.textAlign="left"; g.textBaseline="alphabetic";
+}
+
+/* ---------- rendering: table ------------------------------- */
+function drawTable(){
+  const on = S.markersOn, K = S.nMarkersOn+1;
+  const head = ["well","cells", ...on.map(m => "% "+m),
+                ...Array.from({length:K},(_,k)=>"% "+(POP_NAMES[k]||k+"-pos"))];
+  let html = "<thead><tr>" + head.map(h=>`<th>${h}</th>`).join("") + "</tr></thead><tbody>";
+  for(const r of S.perWell){
+    if(!r.on) continue;
+    const cells = [r.well, r.n.toLocaleString(),
+      ...r.posN.map(v => r.n ? (100*v/r.n).toFixed(1) : "–"),
+      ...Array.from({length:K},(_,k)=> r.n ? (100*(r.counts[k]||0)/r.n).toFixed(1) : "–")];
+    html += "<tr>" + cells.map(c=>`<td>${c}</td>`).join("") + "</tr>";
+  }
+  html += "</tbody>";
+  document.getElementById("tbl").innerHTML = html;
+  const nOn = S.perWell.filter(r=>r.on).length;
+  document.getElementById("tblNote").textContent =
+    `${nOn} well${nOn===1?"":"s"} · percentages within each well sum to 100`;
+}
+
+/* ---------- refresh ---------------------------------------- */
+let rafPending = false;
+function refresh(light){
+  recompute();
+  for(const m of S.markers) if(S.markerOn.has(m)){
+    const inp = document.querySelector(`[data-val="${CSS.escape(m)}"]`);
+    if(inp && document.activeElement !== inp) inp.value = fmtThr(S.thr[m]);
+    const pc = document.querySelector(`[data-pc="${CSS.escape(m)}"]`);
+    if(pc){ const i = S.markersOn.indexOf(m);
+      let p = 0, n = 0;
+      for(const r of S.perWell) if(r.on){ p += r.posN[i]||0; n += r.n; }
+      pc.textContent = n ? (100*p/n).toFixed(1)+"%" : "—"; }
+    drawHist(m, light);
+  }
+  for(const k of S.qcKeys) drawRange(k, light);
+  syncQC();
+  if(rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(()=>{
+    rafPending = false;
+    // While a gate is being dragged we repaint the flow-style plots from
+    // their cached clouds - the crosshair and the quadrant percentages move,
+    // the cells do not. The plate map and table follow on release.
+    document.querySelectorAll("[data-bi]").forEach(cv=>{
+      const [a,b] = cv.dataset.bi.split("|"); drawBiaxial(a,b,light); });
+    drawBars("cPop", "pct"); drawBars("cCnt", "count");
+    drawMorph(); updateStats();
+    if(!light){ drawPlate(); drawTable(); }
+  });
+}
+const fmtThr = v => !isFinite(v) ? "" : (Math.abs(v) >= 100 ? v.toFixed(0) : v.toPrecision(4));
+function updateStats(){
+  const note = document.getElementById("qcNote");
+  if(note){
+    const pre = S.preActive ? S.preActive.length : 0;
+    const post = S.active ? S.active.length : 0;
+    note.innerHTML = qcActive()
+      ? `<b>${post.toLocaleString()}</b> of ${pre.toLocaleString()} cells pass `+
+        `(${pre?(100*post/pre).toFixed(1):0}%) — ${(pre-post).toLocaleString()} removed `+
+        `before gating`
+      : `no filter — all <b>${pre.toLocaleString()}</b> cells in the selected wells `+
+        `go through. Switch on a window to exclude debris, clumps or dying nuclei.`;
+  }
+  document.getElementById("sCells").textContent = S.active.length.toLocaleString();
+  document.getElementById("sTotal").textContent = S.rows.toLocaleString();
+  document.getElementById("sWells").textContent = `${S.wellOn.size}/${S.wells.length}`;
+  document.getElementById("sMark").textContent = `${S.nMarkersOn}/${S.markers.length}`;
+  document.getElementById("popNote").textContent =
+    `${POP_NAMES.slice(0,S.nMarkersOn+1).join(" · ")} — sums to 100% of the ${S.nMarkersOn} active marker${S.nMarkersOn===1?"":"s"}`;
+}
+function metricLabel(){
+  const el = document.getElementById("plateMetric");
+  return el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : "";
+}
+
+/* ---------- sidebar build ---------------------------------- */
+function buildSidebar(){
+  const ch = document.getElementById("chans");
+  ch.innerHTML = S.markers.map(m=>`
+    <label class="chan${S.markerOn.has(m)?"":" off"}" data-m="${m}">
+      <span class="dot" style="background:${markerColor(m)}"></span>
+      <span class="nm">${m}</span><span class="pc" data-mpc="${m}"></span>
+    </label>`).join("");
+  ch.querySelectorAll("[data-m]").forEach(el=>{
+    el.onclick = () => {
+      const m = el.dataset.m;
+      if(S.markerOn.has(m)){ if(S.markerOn.size <= 1) return; S.markerOn.delete(m); }
+      else S.markerOn.add(m);
+      el.classList.toggle("off", !S.markerOn.has(m));
+      buildGates(); buildBiaxial(); buildMetrics(); refresh();
+    };
+  });
+
+  const st = document.getElementById("stat");
+  st.innerHTML = S.stats.map(s=>`<option${s===S.stat?" selected":""}>${s}</option>`).join("");
+  st.onchange = () => {
+    const oldStat = S.stat, newStat = st.value;
+    if(oldStat === newStat) return;
+    const idx = S.preActive && S.preActive.length ? S.preActive : allIdx();
+
+    // Anything keyed on intensity changes scale with the statistic. Carry the
+    // user's choices across by percentile instead of discarding them, and say
+    // plainly what was rescaled - silently resetting a filter is the bug this
+    // replaces.
+    const oldDapi = S.dapi ? `${oldStat}_${S.dapi}` : null;
+    const newDapi = S.dapi ? `${newStat}_${S.dapi}` : null;
+    let dapiWin = null;
+    if(oldDapi && newDapi && S.qc[oldDapi] && S.qc[oldDapi].on && S.cols[newDapi]){
+      const lo = rescale(oldDapi, newDapi, S.qc[oldDapi].lo, idx);
+      const hi = rescale(oldDapi, newDapi, S.qc[oldDapi].hi, idx);
+      if(lo !== null && hi !== null) dapiWin = { lo, hi };
+    }
+    const movedGates = [];
+    const manual = {};
+    for(const m of S.markers){
+      if(!S.thrManual || !S.thrManual[m]) continue;
+      const v = rescale(`${oldStat}_${m}`, `${newStat}_${m}`, S.thr[m], idx);
+      if(v !== null){ manual[m] = v; movedGates.push(m); }
+    }
+
+    S.stat = newStat;
+    if(oldDapi && S.qc[oldDapi]) delete S.qc[oldDapi];
+    detectQC();
+    if(dapiWin && S.qc[newDapi])
+      Object.assign(S.qc[newDapi], { on:true, lo:dapiWin.lo, hi:dapiWin.hi });
+    buildQC();
+    initThresholds();
+    for(const m of movedGates){ S.thr[m] = manual[m]; S.thrManual[m] = true; }
+    refresh();
+
+    const kept = S.qcKeys.filter(k => k.key !== newDapi && S.qc[k.key].on)
+                         .map(k => k.label);
+    const bits = [];
+    if(kept.length) bits.push(`shape windows kept (<span class="k">${kept.join(", ")}</span>)`);
+    if(dapiWin) bits.push(`the ${S.dapi} window was rescaled to the same percentiles`);
+    if(movedGates.length) bits.push(
+      `your manual gates (<span class="k">${movedGates.join(", ")}</span>) were rescaled`);
+    const rest = movedGates.length < S.markers.length
+      ? ` Gates you hadn't touched were re-derived automatically.` : "";
+    toast(`<b>Switched to ${newStat} intensity.</b> ` +
+      (bits.length ? bits.join("; ") + "." : "Thresholds were re-derived for the new scale.") +
+      rest + ` Check the gate positions before trusting the numbers.`, 9000);
+  };
+
+  const pl = document.getElementById("plate2");
+  pl.innerHTML = S.plates.map(p=>`<option${p===S.plate?" selected":""}>${p}</option>`).join("");
+  pl.onchange = () => { S.plate = pl.value; buildWells(); initThresholds();
+                        buildMetrics(); refresh(); };
+  document.getElementById("plateName").textContent = S.plates.length>1 ? "" : String(S.plate);
+  buildMetrics();
+}
+function buildMetrics(){
+  const el = document.getElementById("plateMetric");
+  const on = S.markers.filter(m => S.markerOn.has(m));
+  const opts = [["n_cells","cells per well"], ["pct_any","% any positive"]];
+  for(let k=0;k<=on.length;k++) opts.push(["pct_pop_"+k, "% "+(POP_NAMES[k]||k+"-positive")]);
+  on.forEach((m,i)=> opts.push(["pct_mark_"+i, "% "+m+" positive"]));
+  el.innerHTML = opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join("");
+  if(!opts.some(o=>o[0]===S.metric)) S.metric = "pct_pop_"+Math.min(2,on.length);
+  el.value = S.metric;
+  el.onchange = () => { S.metric = el.value; drawPlate(); };
+}
+
+/* ---------- export ----------------------------------------- */
+function exportCSV(){
+  const on = S.markersOn, K = S.nMarkersOn+1;
+  // Excluded wells are left out of the table entirely rather than flagged -
+  // a column of zeros invites someone downstream to average over it by
+  // accident. Which wells were dropped is recorded in the trailing comments,
+  // so the file still documents its own analysis.
+  const kept = S.perWell.filter(r => r.on);
+  const dropped = S.wells.filter(w => !S.wellOn.has(w));
+  const head = ["plate","well","n_cells", ...(qcActive()?["n_cells_before_filter"]:[]),
+    ...on.map(m=>`n_${m}_positive`), ...on.map(m=>`pct_${m}_positive`),
+    ...Array.from({length:K},(_,k)=>`n_${POP_NAMES[k]||k+"pos"}`),
+    ...Array.from({length:K},(_,k)=>`pct_${POP_NAMES[k]||k+"pos"}`)];
+  const lines = [head.join(",")];
+  for(const r of kept){
+    lines.push([S.plate, r.well, r.n, ...(qcActive()?[r.nRaw]:[]),
+      ...r.posN, ...r.posN.map(v=> r.n?(100*v/r.n).toFixed(4):""),
+      ...Array.from({length:K},(_,k)=>r.counts[k]||0),
+      ...Array.from({length:K},(_,k)=> r.n?(100*(r.counts[k]||0)/r.n).toFixed(4):"")].join(","));
+  }
+  lines.push("");
+  lines.push("# gates applied ("+S.stat+" intensity)");
+  for(const m of on) lines.push(`# ${m},${S.thr[m]}`);
+  lines.push(`# markers included,"${on.join(" ")}"`);
+  if(qcActive()){
+    lines.push("# cell filter applied before gating");
+    for(const k of S.qcKeys){ const q = S.qc[k.key];
+      if(q.on) lines.push(`# ${k.label} window,${q.lo},${q.hi}`); }
+    const pre = S.preActive.length, post = S.active.length;
+    lines.push(`# cells passing filter,${post} of ${pre} (${(100*post/pre).toFixed(2)}%)`);
+  } else lines.push("# cell filter,none");
+  lines.push(`# wells in this file,${kept.length} of ${S.wells.length}`);
+  lines.push(`# wells excluded,"${dropped.join(" ")||"none"}"`);
+  lines.push(`# cells in this file,${kept.reduce((a,r)=>a+r.n,0)}`);
+  lines.push(`# source,${S.name}`);
+  lines.push(`# exported,${new Date().toISOString()}`);
+  const blob = new Blob([lines.join("\n")], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (S.name.replace(/\.(csv|gz|tsv|txt)+$/i,"") || "gating") + "_regated.csv";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ---------- file loading ----------------------------------- */
+const errEl = document.getElementById("err");
+const busy = on => document.getElementById("busy").classList.toggle("on", on);
+
+async function load(file){
+  errEl.textContent = "";
+  busy(true);
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    let text;
+    const buf = await file.arrayBuffer();
+    const gz = file.name.toLowerCase().endsWith(".gz") ||
+               (new Uint8Array(buf,0,2)[0] === 0x1f && new Uint8Array(buf,0,2)[1] === 0x8b);
+    if(gz){
+      if(typeof pako === "undefined")
+        throw new Error("This file is gzipped and the decompressor didn't load "+
+          "(no internet?). Save it as plain .csv with --per-nucleus-format csv, or unzip it first.");
+      text = pako.inflate(new Uint8Array(buf), {to:"string"});
+    } else text = new TextDecoder().decode(buf);
+
+    const p = parseCSV(text);
+    S.name = file.name; S.header = p.header; S.cols = p.cols; S.rows = p.rows;
+    detect();
+    detectQC();
+    initThresholds();
+    document.getElementById("sFile").textContent = file.name;
+    document.getElementById("drop").classList.add("hide");
+    document.getElementById("app").classList.add("ready");
+    buildSidebar(); buildGates(); buildQC();
+    recompute();          // plots need an active set before they can draw
+    buildBiaxial(); refresh();
+  }catch(e){
+    errEl.textContent = e.message || String(e);
+    console.error(e);
+  }finally{ busy(false); }
+}
+
+/* ---------- wiring ----------------------------------------- */
+const fileInput = document.getElementById("file");
+document.getElementById("pick").onclick = () => fileInput.click();
+fileInput.onchange = () => fileInput.files[0] && load(fileInput.files[0]);
+const dz = document.getElementById("dz");
+["dragenter","dragover"].forEach(ev => document.addEventListener(ev, e=>{
+  e.preventDefault(); dz.classList.add("hot"); }));
+["dragleave","drop"].forEach(ev => document.addEventListener(ev, e=>{
+  e.preventDefault(); if(ev==="drop"||e.relatedTarget===null) dz.classList.remove("hot"); }));
+document.addEventListener("drop", e => { e.preventDefault();
+  const f = e.dataTransfer.files[0]; if(f) load(f); });
+
+document.getElementById("bReset").onclick = () => {
+  for(const m of S.markers) S.thr[m] = S.autoThr[m];
+  S.thrManual = {}; refresh(); };
+document.getElementById("bWells").onclick = () => { S.wellOn = new Set(S.wells); refresh(); };
+document.getElementById("invert").onclick = () => {
+  S.wellOn = new Set(S.wells.filter(w => !S.wellOn.has(w))); refresh(); };
+document.getElementById("allMark").onclick = () => {
+  S.markerOn = new Set(S.markers);
+  document.querySelectorAll("[data-m]").forEach(e=>e.classList.remove("off"));
+  buildGates(); buildBiaxial(); buildMetrics(); refresh(); };
+document.getElementById("qcAuto").onclick = () => {
+  for(const k of S.qcKeys){ const w = autoWindow(k.key);
+    if(w){ S.qc[k.key].on = true; S.qc[k.key].lo = w[0]; S.qc[k.key].hi = w[1]; } }
+  syncQC(); refresh(); };
+document.getElementById("qcOff").onclick = () => {
+  for(const k of S.qcKeys){ const q = S.qc[k.key];
+    q.on = false; q.lo = q.min; q.hi = q.max; }
+  syncQC(); refresh(); };
+document.getElementById("bExport").onclick = exportCSV;
+document.getElementById("bNew").onclick = () => {
+  document.getElementById("app").classList.remove("ready");
+  document.getElementById("drop").classList.remove("hide");
+  fileInput.value = ""; };
+
+let rt; addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(()=>{
+  if(document.getElementById("app").classList.contains("ready")) refresh(); }, 140); });
+
+// If data was embedded by --export-explorer, load it without a file dialog.
+if(window.EMBEDDED_CSV){
+  const blob = new File([window.EMBEDDED_CSV], window.EMBEDDED_NAME || "embedded.csv");
+  load(blob);
+}
+
+
+  // expose what the workbench shell needs
+  window.NF_GATE = {
+    S, refresh,
+    initFrom(parsed, name){
+      S.name = name; S.header = parsed.header; S.cols = parsed.cols; S.rows = parsed.rows;
+      detect(); detectQC(); initThresholds();
+      document.getElementById("sFile").textContent = name;
+      document.getElementById("drop").classList.add("hide");
+      document.getElementById("app").classList.add("ready");
+      buildSidebar(); buildGates(); buildQC();
+      recompute(); buildBiaxial(); refresh();
+    },
+    parseCSV,
+    markers: () => S.markersOn || [],
+  };
+
+})();
+</script>
+<script>
+(function(){
+  /* --- pane isolation -------------------------------------------------
+     `document` is shadowed for the app inside this closure: ids get the
+     pane prefix, and element queries are scoped to the pane's subtree.
+     The app's own code needs no changes. */
+  const __ROOT = window.document.getElementById("pane-cond");
+  const __PFX  = "C-";
+  const document = new Proxy(window.document, {
+    get(t, k){
+      if(k === "getElementById") return id => __ROOT.querySelector("#" + CSS.escape(__PFX + id));
+      if(k === "querySelector")  return s  => __ROOT.querySelector(s);
+      if(k === "querySelectorAll") return s => __ROOT.querySelectorAll(s);
+      const v = t[k];
+      return typeof v === "function" ? v.bind(t) : v;
+    }
+  });
+
+
 /* ============================================================
    Well-level statistics for condition comparison.
    The unit of replication is the WELL, never the cell.
@@ -3263,6 +5025,237 @@ if(window.EMBEDDED_CSV)
 
 
 
+
+
+  window.NF_COND = {
+    S, refresh, parseCSV,
+    initFrom(parsed, name){
+      S.name = name; S.header = parsed.header; S.cols = parsed.cols; S.rows = parsed.rows;
+      S.groups = []; S.assign = new Map(); S.active = 0; S.ref = 0;
+      detect(); buildUI();
+      const auto = document.getElementById("autoCol");
+      if(auto && auto.value) autoGroup(auto.value);
+      document.getElementById("sFile").textContent = name +
+        (S.kind === "cell" ? "  (per-nucleus)" : "  (per-well)");
+      document.getElementById("drop").classList.add("hide");
+      document.getElementById("app").classList.add("ready");
+      refresh();
+    },
+    rebuild(){                       // gates changed upstream: re-read the columns
+      if(!S.rows) return;
+      const keepSplit = S.split;
+      buildWellRows();               // the exclusion set may have changed
+      buildMetrics();
+      buildMetricOptions();          // the LIST changes, not just the selection
+      buildSiOptions(); buildSplitOptions();
+      if(splitCandidates().some(c => c[0] === keepSplit)) S.split = keepSplit;
+      const sp = document.getElementById("split"); if(sp) sp.value = S.split;
+      refresh();
+    },
+  };
+
+})();
+</script>
+<script>
+/* ============================================================
+   Workbench shell: one file, two tabs, one set of cells.
+   ============================================================ */
+"use strict";
+const WB = { parsed:null, name:"", kind:"", tab:"gate" };
+const $ = id => document.getElementById(id);
+const busy = on => $("wbBusy").classList.toggle("on", on);
+let noteTimer = null;
+function note(html, ms = 6000){
+  const el = $("wbNote"); el.innerHTML = html; el.classList.add("show");
+  clearTimeout(noteTimer); noteTimer = setTimeout(()=> el.classList.remove("show"), ms);
+}
+
+function showTab(which){
+  WB.tab = which;
+  $("tabGate").classList.toggle("on", which === "gate");
+  $("tabCond").classList.toggle("on", which === "cond");
+  $("pane-gate").classList.toggle("on", which === "gate");
+  $("pane-cond").classList.toggle("on", which === "cond");
+  // each pane sizes its canvases from clientWidth, which is 0 while hidden
+  const app = which === "gate" ? window.NF_GATE : window.NF_COND;
+  if(app && app.S && app.S.rows) requestAnimationFrame(()=> app.refresh());
+}
+
+/** Write the gating tab's live calls back into the shared columns, so the
+ *  analysis tab sees the gates you actually set rather than whatever the
+ *  pipeline stored. This is the whole reason the two live in one file. */
+function applyGates(quiet){
+  const G = window.NF_GATE, C = window.NF_COND;
+  if(!G || !G.S.rows || !C || !C.S.rows) return;
+  const S = G.S, act = S.active;
+  if(!act || !S.markersOn) return;
+  const cols = S.cols, header = S.header;
+  const add = (name, arr) => {
+    cols[name] = arr;
+    if(!header.includes(name)) header.push(name);
+  };
+  const stat = S.stat;
+  const on = S.markersOn;
+  const dropped = [];
+  // per-marker positivity
+  const pos = on.map(m => {
+    const a = new Float64Array(S.rows);
+    const v = cols[`${stat}_${m}`], thr = S.thr[m];
+    for(let j=0;j<act.length;j++){ const i = act[j]; a[i] = v[i] > thr ? 1 : 0; }
+    return a;
+  });
+  on.forEach((m,k)=> add("pos_"+m, pos[k]));
+  // A marker switched off in the gating tab must not linger here as a stale
+  // column: it would still be offered as a way to split cells, using calls
+  // that no longer reflect any gate on screen.
+  for(const m of S.markers){
+    if(on.includes(m)) continue;
+    const key = "pos_"+m;
+    if(key in cols){
+      delete cols[key];
+      const at = header.indexOf(key);
+      if(at >= 0) header.splice(at, 1);
+      dropped.push(m);
+    }
+  }
+  // population / combination, over the ACTIVE markers only
+  const POP = ["negative","single","double","triple","quadruple","quintuple"];
+  const popCol = new Array(S.rows).fill("");
+  const comboCol = new Array(S.rows).fill("");
+  for(let j=0;j<act.length;j++){
+    const i = act[j];
+    let n = 0, names = [];
+    for(let k=0;k<on.length;k++) if(pos[k][i]){ n++; names.push(on[k]); }
+    popCol[i] = POP[n] || (n+"-positive");
+    comboCol[i] = names.length ? names.join("+")+"+" : "all-negative";
+  }
+  add("population", popCol); add("combination", comboCol);
+  // foci positivity, if the gating tab computed any
+  for(const c of header.filter(h => h.startsWith("foci_n_"))){
+    const ch = c.slice(7), a = new Float64Array(S.rows), v = cols[c];
+    for(let j=0;j<act.length;j++){ const i = act[j]; a[i] = v[i] >= S.foci_min_count_hint ? 1 : 0; }
+  }
+  // The cell filter carries across. A cell the gating tab threw out as debris
+  // or a dying nucleus must not sit in the analysis tab's denominator: it would
+  // silently drag every population percentage below 100.
+  if(S.qcKeep){
+    const d = new Float64Array(S.rows);
+    for(let i=0;i<S.rows;i++) d[i] = S.qcKeep[i] ? 0 : 1;
+    add("excluded_by_filter", d);
+    C.S.excludeCol = "excluded_by_filter";
+  } else {
+    C.S.excludeCol = "";
+    if("excluded_by_filter" in cols){
+      delete cols["excluded_by_filter"];
+      const at = header.indexOf("excluded_by_filter");
+      if(at >= 0) header.splice(at, 1);
+    }
+  }
+  // cells outside the gating tab's active set are unclassified; drop them too
+  // rather than leaving them to dilute the percentages
+  {
+    const un = new Float64Array(S.rows);
+    let anyUn = false;
+    const inAct = new Uint8Array(S.rows);
+    for(let j=0;j<act.length;j++) inAct[act[j]] = 1;
+    for(let i=0;i<S.rows;i++) if(!inAct[i]){ un[i] = 1; anyUn = true; }
+    if(anyUn){
+      add("excluded_by_filter", un);
+      C.S.excludeCol = "excluded_by_filter";
+    }
+  }
+  // the analysis tab hides readouts and splits for markers that are off
+  C.S.hiddenMarkers = S.markers.filter(m => !on.includes(m));
+  C.rebuild();
+  if(!quiet) note(`<b>Gates applied.</b> ${on.length} marker${on.length===1?"":"s"} `+
+    `(${on.join(", ")}) and the population calls were written into the analysis tab.` +
+    (dropped.length ? ` <b>${dropped.join(", ")}</b> ${dropped.length===1?"is":"are"} `+
+      `switched off in the gating tab, so ${dropped.length===1?"it was":"they were"} `+
+      `removed from the analysis too.` : "") +
+    ` Wells you excluded in the gating tab are still present here — exclude them again `+
+    `on this tab if you meant to drop them.`, 9000);
+}
+
+/* ---------- loading, once, for both panes ---------- */
+async function loadFile(file){
+  $("wbErr").textContent = ""; busy(true);
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    const buf = await file.arrayBuffer();
+    const head = new Uint8Array(buf,0,2);
+    const gz = file.name.toLowerCase().endsWith(".gz") || (head[0]===0x1f && head[1]===0x8b);
+    let text;
+    if(gz){
+      if(typeof pako === "undefined") throw new Error(
+        "This file is gzipped and the decompressor didn't load (no internet?). "+
+        "Use a plain .csv, or unzip it first.");
+      text = pako.inflate(new Uint8Array(buf), {to:"string"});
+    } else text = new TextDecoder().decode(buf);
+
+    // both panes share these columns, so parse once with the wider type
+    const parsed = window.NF_COND.parseCSV(text);
+    WB.parsed = parsed; WB.name = file.name;
+    const perCell = parsed.header.some(c => /^(mean|median|integrated)_/.test(c))
+                 && !parsed.header.includes("n_cells");
+    WB.kind = perCell ? "cell" : "well";
+
+    let gateOK = false;
+    if(perCell){
+      try { window.NF_GATE.initFrom(parsed, file.name); gateOK = true; }
+      catch(e){ console.warn("gating tab:", e); }
+    }
+    window.NF_COND.initFrom(parsed, file.name);
+
+    $("tabGate").disabled = !gateOK;
+    $("wbSync").style.display = gateOK ? "" : "none";
+    $("wbFile").innerHTML = `<b>${file.name}</b> · ${
+      parsed.rows.toLocaleString()} rows · ${perCell ? "per-nucleus" : "per-well"}`;
+    $("wbDrop").classList.add("hide");
+    showTab(gateOK ? "gate" : "cond");
+    if(gateOK){ applyGates(true); markerSig = (window.NF_GATE.S.markersOn||[]).join("|"); }
+    else note("<b>Loaded a per-well summary.</b> The gating tab needs per-nucleus "+
+      "data, so it is disabled — the analysis tab has everything it needs.", 8000);
+  }catch(e){
+    $("wbErr").textContent = e.message || String(e);
+    console.error(e);
+  }finally{ busy(false); }
+}
+
+$("wbPick").onclick = () => $("wbFileInput").click();
+$("wbFileInput").onchange = () => $("wbFileInput").files[0] && loadFile($("wbFileInput").files[0]);
+["dragenter","dragover"].forEach(ev => document.addEventListener(ev, e=>{
+  e.preventDefault(); $("wbDz").classList.add("hot"); }));
+document.addEventListener("dragleave", e=>{ if(e.relatedTarget===null) $("wbDz").classList.remove("hot"); });
+document.addEventListener("drop", e=>{ e.preventDefault(); $("wbDz").classList.remove("hot");
+  const f = e.dataTransfer.files[0]; if(f) loadFile(f); });
+// Switching a marker on or off changes what the analysis *is*, so it flows
+// through immediately. Thresholds still need "Apply gates" — those you nudge
+// repeatedly, and the analysis tab should not churn underneath you.
+let markerSig = "";
+function watchMarkers(){
+  const G = window.NF_GATE;
+  if(!G || !G.S.rows) return;
+  const sig = (G.S.markersOn || []).join("|");
+  if(markerSig === "") { markerSig = sig; return; }
+  if(sig === markerSig) return;
+  markerSig = sig;
+  applyGates(true);
+  const off = G.S.markers.filter(m => !(G.S.markersOn||[]).includes(m));
+  note(`<b>Markers changed.</b> The analysis tab now uses ` +
+    `${(G.S.markersOn||[]).join(", ") || "no markers"}` +
+    (off.length ? `; ${off.join(", ")} ${off.length===1?"is":"are"} excluded from ` +
+      `readouts, splits and the population classes.` : "."), 8000);
+}
+$("pane-gate").addEventListener("click", e => {
+  if(e.target.closest("[data-m]") || e.target.closest("#G-allMark"))
+    setTimeout(watchMarkers, 0);
+});
+
+$("tabGate").onclick = () => showTab("gate");
+$("tabCond").onclick = () => { showTab("cond"); };
+$("wbSync").onclick = () => applyGates(false);
+$("wbNew").onclick = () => { $("wbDrop").classList.remove("hide");
+  $("wbFileInput").value = ""; };
 </script>
 </body>
 </html>
